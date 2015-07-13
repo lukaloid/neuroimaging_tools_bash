@@ -1,0 +1,19 @@
+#!/bin/bash
+# AUTHOR: Luka Ruzic
+
+usage() {
+    {
+	echo "Usage: mm2vox <x> <y> <z>"
+    }
+
+    exit ${exnum:1}
+}
+
+if [[ "$*" =~ -help ]]; then exnum=0; usage; fi
+if [ $# -ne 3 ]||[[ "$*" =~ [^0-9-.\ ] ]]; then usage; fi
+
+MNI_BRAIN=`findMNI`
+
+echo $1 $2 $3 | std2imgcoord -std $MNI_BRAIN -img $MNI_BRAIN -vox | awk '{print $1,$2,$3}'
+
+exit 0

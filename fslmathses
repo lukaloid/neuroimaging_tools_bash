@@ -1,0 +1,222 @@
+#!/bin/bash
+# AUTHOR: Luka Ruzic 2015
+
+set -f # why is this needed again?
+
+# because /tmp doesn't always exist this will need
+# to be set for every computer it's installed on
+[ ! $TMPDIR ] && TMPDIR=/tmp
+
+# set image extension based on environment variable $FSLOUTPUTTYPE
+case $FSLOUTPUTTYPE in
+    "NIFTI_GZ") IMGEXT=.nii.gz;;
+    "NIFTI") IMGEXT=.nii;;
+    "NIFTI_PAIR") IMGEXT=.img;;
+    "NIFTI_PAIR_GZ") IMGEXT=.img.gz;;
+    "ANALYZE_GZ") IMGEXT=.img.gz;;
+    "ANALYZE") IMGEXT=.img;;
+    *) FSLOUTPUTTYPE=NIFTI_GZ
+esac
+
+mktempfail() {
+    echo "mktemp failed" >&2
+    exit 1
+}
+
+usage() {
+    echo "
+USAGE: fslmathses [options] [-o <outputfile>] -c <command string>
+DESCRIPTION
+ A wrapper to extend the functionality of fslmaths
+OPTIONS
+ -o <outputfile>
+     If fslmathses command culminates in fslmaths command, output
+       will be written to <outputfile>
+ -v
+     verbose
+ 
+NOTES
+  Since fslmathses depends on having output that is either numbers or
+    names of files, all other output goes over stderr (&2).
+  All statistics done on non-zero voxels only.
+  Intended to handle 3d image operations.
+  For image operations, images must be in same space (or use built-in flirt capabilities).
+COMMAND STRINGS
+ A command string can be interpreted by:
+   fslmathses  (fslmathses <command string>) (see FSLMATHSES COMMANDS below)
+   fslmaths     (fslmaths <command string>, leave out the output file name)   
+   awk          (echo | awk '{print <command string>}')
+   flirt        (via fslmathses, see flirt FSLMATHSES COMMAND below)
+ A command string can contain the result of a self-contained command string set in parens:
+   fslmathses -o myimg1 -c (demeaned $img1) -mul (demeaned $img2)
+   fslmathses -o myimg2 -c dot (demeaned $img1) (normed (demeaned $img2))
+FSLMATHSES COMMANDS
+ mean img         ->  mean across voxels of img
+ demeaned img     ->  img divided by mean of nonzero voxels
+ abs img          ->  absolute value of img (equivalent to \"(img -abs)\")
+ min img          ->  minimum voxel intensity
+ max img          ->  maximum voxel intensity
+ nvox img         ->  number of nonzero voxels
+ stdev img        ->  standard deviation of nonzero voxels
+ zscored img      ->  img with z-scored intensities
+ norm img         ->  norm (L2)  of img
+ normed img       ->  img divided by norm (L2) of img
+ l1norm img       ->  L1 norm of img
+ l1normed img     ->  img divided by L1 norm of img
+ dot img1 img2    ->  dot product of img1 and img2
+ corr img1 img2   ->  pearson correlation of img1 and img2
+ flirt <cmd>      ->  result of flirt <cmd> (leave \"-out\" option unspecified)
+
+EXAMPLES
+  fslmathses -c 1+1
+  fslmathses -o avg -c img1 -add img2 -div 2
+  fslmathses -c mean img1
+  fslmathses -o img2 -c img1 -div \\(stdev img1\\)
+  fslmathses -o img3 -c \"img1 -mul (100 * (corr img1 (demeaned img2)))\"
+"
+    exit ${exnum:1}
+}
+
+
+# must have at least one argument
+if [ $# -lt 1 ]; then
+    echo "INSUFFICIENT ARGUMENTS" >&2
+    usage
+fi
+
+# parse arguments (must start with "-")
+while [ "$1" ]&&[ "${1:0:1}" == "-" ]; do
+    if [[ "$1" =~ -help$ ]]; then  # will get -help and --help
+	exnum=0
+	usage
+    elif [ "$1" == "-c" ]; then
+	shift
+	CMD="$*"
+	break
+    elif [ "$1" == "-o" ]; then
+	FOUT=$2
+	shift 2
+    elif [ "$1" == "-v" ]; then
+	V=set
+	shift
+    elif [ "$1" == "--debug" ]; then
+	DB=set
+	V=set
+	shift
+    elif [ "$1" == "-wd" ]; then
+	wd=$2
+	shift 2
+    else
+	echo "UNRECOGNIZED ARGUMENT: $1" >&2
+	exit 1
+    fi	
+done
+
+
+# define temporary working directory, if need be
+if [ ! $wd ]||[ ! -d $wd ]; then
+    wd=$TMPDIR/tmp_${$}
+    mkdir $wd || mktempfail
+fi
+
+# set up ${ARGS[]} to be passed to other fslmathses commands
+ARGS=()
+[ $V ] && ARGS+=("-v")
+[ $DB ] && ARGS+=("--debug")
+[ $wd ] && ARGS+=("-wd $wd")
+
+[ $V ] && echo "job$$ STARTING: $(basename $0) $CMD" >&2
+
+# parse out commands nested within ()'s, from inside out
+while [ $(echo $CMD | grep -cE '\([^()]*\)') -gt 0 ]; do
+    CMDa="$(echo "$CMD" | sed 's|^\(.*\)(\([^()]*\))\(.*\)$|\1|')"  # before innermost command
+    CMDb="$(echo "$CMD" | sed 's|^\(.*\)(\([^()]*\))\(.*\)$|\3|')"  # after innermost command
+    CMD=($(echo "$CMD" | sed 's|^\(.*\)(\([^)]*\))\(.*\)$|\2|'))    # innermost command
+    
+    # execute innermost commands
+    CMD="fslmathses ${ARGS[*]} -c ${CMD[*]}"
+    #[ $DB ] && echo "CMDa=\"$CMDa\"" >&2
+    #[ $DB ] && echo "CMDb=\"$CMDb\"" >&2    
+    [ $DB ] && echo "job$$ EXECUTING: $CMD" >&2
+    CMDresult="$(eval $CMD)"
+    
+    # reconstitute command with output of innermost command (sed away extra spaces)
+    CMD=("$(echo $CMDa $CMDresult $CMDb | sed -e 's|\s\{1,\}| |g' -e 's|^ ||' -e 's| $||')")
+done
+
+
+# helper function:
+#   USAGE makeitso <1|2> <nARGS> <arg> [...]
+#         first argument: 1: verbose if -v is set, 2: verbose if --debug is set
+#         second argument: number of arguments in command
+makeitso() {
+    if [ $2 -gt 0 ]&&[ ${#CMD[*]} -ne $2 ]; then echo "${CMD[0]} takes $(echo $2 - 1 | bc) argument(s)"; exit 1; fi # this might be unhelpful feedback... requires testing
+    ([ $1 == 1 ]&&[ $V ]) || ([ $1 == 2 ]&&[ $DB ]) && echo "job$$ EXECUTING: $3" >&2
+    eval "$3"
+}
+
+# parenthetical commands taken care of, execute present command
+CMD=($CMD)
+case "${CMD[0]}" in    
+    "mean")
+	makeitso 1 2 "fslstats ${CMD[1]} -n -M";;
+	#if [ ${#CMD[*]} -ne 2 ]; then echo "${CMD[0]} takes 1 argument"; exit 1; fi
+	#CMD="fslstats ${CMD[1]} -M"
+	#[ $V ] && echo "job$$ EXECUTING: $CMD" >&2; eval "$CMD";;
+    "demeaned")
+	makeitso 2 2 "fslmathses ${ARGS[*]} -c \"${CMD[1]} -sub (mean ${CMD[1]})\"";;
+    "abs")
+	makeitso 2 2 "fslmathses ${ARGS[*]} -c \"${CMD[1]} -abs\"";;
+    "nvox")
+	makeitso 1 2 "fslstats ${CMD[1]} -n -V | awk '{print \$1}'";;
+    "sum")
+	makeitso 2 2 "fslmathses ${ARGS[*]} -c \"(mean ${CMD[1]}) * (nvox ${CMD[1]})\"";;
+    "abssum")
+	makeitso 2 2 "fslmathses ${ARGS[*]} -c \"(mean (${CMD[1]} -abs)) * (nvox ${CMD[1]})\"";;
+    "min")
+	makeitso 1 2 "fslstats ${CMD[1]} -n -R | awk '{printf(\"%f\",\$1)}'";;
+    "max")
+	makeitso 1 2 "fslstats ${CMD[1]} -n -R | awk '{printf(\"%f\",\$2)}'";;
+    "stdev")
+	makeitso 1 2 "fslstats ${CMD[1]} -n -S";;
+    "zscored")
+	makeitso 2 2 "fslmathses ${ARGS[*]} -c \"(demeaned ${CMD[1]}) -div (stdev ${CMD[1]})\"";;
+    "norm")
+	makeitso 2 2 "fslmathses ${ARGS[*]} -c \"(sum (${CMD[1]} -sqr)) ^ 0.5\"";;
+    "normed")
+	makeitso 2 2 "fslmathses ${ARGS[*]} -c \"${CMD[1]} -div (norm ${CMD[1]})\"";;
+    "l1norm")
+	makeitso 2 2 "fslmathses ${ARGS[*]} -c \"sum (${CMD[1]} -abs)\"";;
+    "l1normed")
+	makeitso 2 2 "fslmathses ${ARGS[*]} -c \"${CMD[1]} -div (l1norm ${CMD[1]})\"";;
+    "dot")
+	makeitso 2 3 "fslmathses ${ARGS[*]} -c \"sum (${CMD[1]} -mul ${CMD[2]})\"";;
+    "cossim")
+	makeitso 2 3 "fslmathses ${ARGS[*]} -c \"(dot ${CMD[1]} ${CMD[2]}) / ((norm ${CMD[1]}) * (norm ${CMD[2]}))\"";;
+    "corr")				
+	makeitso 2 3 "fslmathses ${ARGS[*]} -c \"(dot (demeaned ${CMD[1]}) (demeaned ${CMD[2]})) / ((norm (demeaned ${CMD[1]})) * (norm (demeaned ${CMD[2]})))\"";;
+    "flirt")
+	fout="$(ls $wd | xargs -n1 remove_ext | sort -n | awk 'END {printf("%s/step%04d","'${wd}'",$1+1)}')"
+	CMD="${CMD[*]} -out $fout 1>&2"
+	makeitso 1 0 "${CMD[*]} -out $fout 1>&2"
+	[ $V ] && echo "job$$ EXECUTING: $CMD" >&2; eval "$CMD"; echo "$fout";;
+    *) # command isn't recognized as one fslmathses or fslstats handles: must be either fslmaths or awk
+	CMD="${CMD[*]}"	
+	if [ $(imtest $(echo "$CMD" | cut -d" " -f1)) -eq 1 ]; then  # first argument is an image
+	    # fout is either defined by user
+	    # OR assigned the next step number (based on files existing in the temporary working directory $wd)
+	    [ $FOUT ] && fout="$FOUT" || fout="$(ls $wd | xargs -n1 remove_ext | sort -n | awk 'END {printf("%s/step%04d","'${wd}'",$1+1)}')"
+
+	    # make into fslmaths command and execute
+	    CMD="fslmaths $CMD $fout"
+	    [ $V ] && echo "job$$ EXECUTING: $CMD" >&2; eval $CMD    
+	    echo ${fout}${IMGEXT}
+	else  # assume awk can evaluate it
+	    CMD="echo | awk '{print $CMD}'"
+	    [ $V ] && echo "job$$ EXECUTING: $CMD" >&2; eval "$CMD"
+	fi
+esac
+
+[ ! $DEBUG ]&&[ $wd == $TMPDIR/tmp_${$} ] && rm -r $wd
+
+exit 0
