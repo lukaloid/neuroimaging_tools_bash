@@ -16,32 +16,33 @@ ATLAS_DECODER=(\
 )
 
 usage () {
-    {
-    echo "Usage: $0 <x> <y> <z> [options]"
-    echo "Description:  takes MNI coordinates (mm) <x> <y> <z> and returns a name, hemisphere, and Brodmann Area (given by the Talairach Daemon)"
-    echo "              searches for the most probable Brodmann Area* label within a 9x9x9 cube of the MNI coordinates"
-    echo "              if no such label is found, mm2label exits with exit status 9"
-    echo "              (* only cortical gray matter, no subcortical or cerebellar Talairach labels are given)"
-    echo "Options:"
-    echo "  -icbm"
-    echo "     use the ICBM Lancaster coordinate conversion (default: Brett coordinates) (only applies to TD, not -a atlases)"
-# hidden in the usage because users should get used to using vox2mm instead
-# but retained so as to not break anything already using the option    
-#    echo "  -vox"
-#    echo "     convert input coordinates from MNI vox (2mm resolution) to MNI mm"
-    echo "  -a [thr%] <ATLAS CODE>"
-    echo "     report from an FSL probabilistic atlas instead of the Talairach Daemon"
-    echo "     threshold regions at thr% (DEFAULT: 0%)"
-    echo "     (only integer percenteges allowed)"
-    echo "     ex: mm2label 0 0 0 -a 75% 1"
-    echo "       ATLAS CODES:"
+    echo "
+Usage: $0 <x> <y> <z> [options]
+Description:  takes MNI coordinates (mm) <x> <y> <z> and returns a name, hemisphere, and Brodmann Area (given by the Talairach Daemon)
+              searches for the most probable Brodmann Area* label within a 9x9x9 cube of the MNI coordinates
+              if no such label is found, mm2label exits with exit status 9
+              (* only cortical gray matter, no subcortical or cerebellar Talairach labels are given)
+Options:
+  -icbm
+     use the ICBM Lancaster coordinate conversion (default: Brett coordinates) (only applies to TD, not -a atlases)
+  -a [thr%] <ATLAS CODE>
+     report from an FSL probabilistic atlas instead of the Talairach Daemon
+     threshold regions at thr% (DEFAULT: 0%)
+     (only integer percenteges allowed)
+     ex: mm2label 0 0 0 -a 75% 1
+ATLAS CODES:"
     for (( i=1; i<${#ATLAS_DECODER[*]} ; i++ )); do
 	echo "          $i: ${ATLAS_DECODER[i]}"
     done
-    }
 
-    exit ${exnum:1}
+    exit ${1:-1}
 }
+
+# hidden in the usage because users should get used to using vox2mm instead
+# but retained so as to not break anything already using the option    
+#  -vox
+#     convert input coordinates from MNI vox (2mm resolution) to MNI mm
+
 
 too_many_tries() {
     echo "$0 is bombing out with $MAXTRIES failed queries of the Talairach Daemon" >&2
@@ -60,8 +61,7 @@ PCT=0
 n=0
 while [ "$1" ]; do
     if [[ "$1" =~ -help ]]; then
-	exnum=0
-	usage
+	usage 0
     elif [[ "$1" =~ ^-{0,1}[0-9]*$ ]]; then
 	COORDINATES+="$1 "
 	let n++
