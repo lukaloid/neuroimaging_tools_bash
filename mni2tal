@@ -2,16 +2,14 @@
 # AUTHOR: Luka Ruzic
 
 usage() {
-    {
-	echo "Usage: mni2tal xmni ymni zmni"
-	echo "       all coordinates in mm"
-    }
+    echo "Usage: mni2tal xmni ymni zmni"
+    echo "       all coordinates in mm"
     
-    exit ${exnum:1}
+    exit ${1:-1}
 }
 
-if [[ "$*" =~ -help ]]; then exnum=0; usage; fi
-if [ $# -ne 3 ]||[[ "$*" =~ [^0-9-.\ ] ]]; then
+[[ "$*" =~ -help ]] && usage 0
+if [ $# -ne 3 ] || [[ "$*" =~ [^0-9-.\ ] ]]; then
     usage
 fi
 
@@ -31,14 +29,14 @@ zmni=$3
 # ytal = (0.9688 * ymni) + (0.0420 * zmni)
 # ztal = (-0.0485 * ymni) + (0.8390 * zmni)
 
-if [ `echo $zmni | awk '{if ($1>=0) print 1; else print 0}'` -eq 1 ]; then
-    xtal=`echo $xmni | awk '{printf ("%.1f",.99*$1)}'`
-    ytal=`echo $ymni $zmni | awk '{printf ("%.1f",(.9688*$1)+(.046*$2))}'`
-    ztal=`echo $ymni $zmni | awk '{printf ("%.1f",(-.0485*$1)+(.9189*$2))}'`
+if [ $(echo $zmni | awk '{if ($1>=0) print 1; else print 0}') -eq 1 ]; then
+    xtal=$(echo $xmni | awk '{printf ("%.1f",.99*$1)}')
+    ytal=$(echo $ymni $zmni | awk '{printf ("%.1f",(.9688*$1)+(.046*$2))}')
+    ztal=$(echo $ymni $zmni | awk '{printf ("%.1f",(-.0485*$1)+(.9189*$2))}')
 else
-    xtal=`echo $xmni | awk '{printf ("%.1f",.99*$1)}'`
-    ytal=`echo $ymni $zmni | awk '{printf ("%.1f",(.9688*$1)+(.042*$2))}'`
-    ztal=`echo $ymni $zmni | awk '{printf ("%.1f",(-.0485*$1)+(.8390*$2))}'`    
+    xtal=$(echo $xmni | awk '{printf ("%.1f",.99*$1)}')
+    ytal=$(echo $ymni $zmni | awk '{printf ("%.1f",(.9688*$1)+(.042*$2))}')
+    ztal=$(echo $ymni $zmni | awk '{printf ("%.1f",(-.0485*$1)+(.8390*$2))}')    
 fi
 
 #return
