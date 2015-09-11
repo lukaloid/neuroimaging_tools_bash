@@ -2,19 +2,20 @@
 # AUTHOR: Luka Ruzic
 
 usage() {
-    {
-	echo "Usage: vox2mm <x> <y> <z>"
-    }
+    echo "Usage: vox2mm <x> <y> <z>"
 
-    exit ${exnum:1}
+    exit ${1:-1}
 }
 
-if [[ "$*" =~ -help ]]; then exnum=0; usage; fi
-if [ $# -ne 3 ]; then usage; fi
-if [[ "$*" =~ [^0-9.\ ] ]]; then [[ "$*" =~ - ]] && echo "no negative numbers"; usage; fi
+[[ "$*" =~ -help ]] && usage 0
+[ $# -ne 3 ] && usage
+if [[ "$*" =~ [^0-9.\ ] ]] && [[ "$*" =~ - ]]; then 
+    echo "no negative numbers"
+    usage
+fi
 
 
-MNI_BRAIN=`findMNI`
+MNI_BRAIN=$(findMNI)
 
 echo $1 $2 $3 | img2stdcoord -std $MNI_BRAIN -img $MNI_BRAIN | awk '{print $1,$2,$3}'
 
