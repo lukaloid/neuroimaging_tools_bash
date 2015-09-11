@@ -58,6 +58,7 @@ Options:
 }
 
 [[ "$*" =~ "-help" ]] && usage 0
+if [ $# -ne 2 ]; then echo "ERROR: insufficient arguments" >&2; usage; fi
 
 
 # note: this function only works if the desired output is singular
@@ -70,8 +71,6 @@ schmecho() {
 
     echo $* | tr ' ' '\n'
 }
-
-if [ $# -ne 2 ]; then echo "ERROR: insufficient arguments" >&2; usage; fi
 
 
 
