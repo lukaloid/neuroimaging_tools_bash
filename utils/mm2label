@@ -38,6 +38,8 @@ ATLAS CODES:"
     exit ${1:-1}
 }
 
+[[ " $* " =~ " "-*help" " ]] && usage 0
+
 # hidden in the usage because users should get used to using vox2mm instead
 # but retained so as to not break anything already using the option    
 #  -vox
@@ -60,9 +62,7 @@ tdquery() {
 pct=0
 n=0
 while [ "$1" ]; do
-    if [[ "$1" =~ -help ]]; then
-	usage 0
-    elif [[ "$1" =~ ^-{0,1}[0-9]*$ ]]; then
+    if [[ "$1" =~ ^-{0,1}[0-9]*$ ]]; then
 	coordinates+="$1 "
 	let n++
 	shift

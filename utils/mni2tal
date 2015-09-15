@@ -8,7 +8,7 @@ usage() {
     exit ${1:-1}
 }
 
-[[ "$*" =~ -help ]] && usage 0
+[[ " $* " =~ " "-*help" " ]] && usage 0
 if [ $# -ne 3 ] || [[ "$*" =~ [^0-9-.\ ] ]]; then
     usage
 fi

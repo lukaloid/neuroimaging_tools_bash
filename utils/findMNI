@@ -18,7 +18,7 @@ Options:
     exit ${1:-1}
 }
 
-[[ "$*" =~ -help ]] && usage 0
+[[ " $* " =~ " "-*help" " ]] && usage 0
 
 if [ $# -eq 0 ]; then
     ls $FSLDIR/*/*/MNI152_T1_2mm_brain.*[zr] | head -1    
