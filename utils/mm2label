@@ -1,10 +1,10 @@
 #!/bin/bash
 # Author: Luka Ruzic
 
-MAXTRIES=3
+maxtries=3
 
 ### setup atlases (1-indexed)
-ATLAS_DECODER=(\
+atlas_decoder=(\
 "" \
 "Harvard-Oxford Cortical Structural Atlas" \
 "Harvard-Oxford Subcortical Structural Atlas" \
@@ -31,8 +31,8 @@ Options:
      (only integer percenteges allowed)
      ex: mm2label 0 0 0 -a 75% 1
 ATLAS CODES:"
-    for (( i=1; i<${#ATLAS_DECODER[*]} ; i++ )); do
-	echo "          $i: ${ATLAS_DECODER[i]}"
+    for (( i=1; i<${#atlas_decoder[*]} ; i++ )); do
+	echo "          $i: ${atlas_decoder[i]}"
     done
 
     exit ${1:-1}
@@ -45,7 +45,7 @@ ATLAS CODES:"
 
 
 too_many_tries() {
-    echo "$0 is bombing out with $MAXTRIES failed queries of the Talairach Daemon" >&2
+    echo "$0 is bombing out with $maxtries failed queries of the Talairach Daemon" >&2
     exit 8
 }
 
@@ -57,25 +57,25 @@ tdquery() {
 
 
 ### PARSE ARGUMENTS
-PCT=0
+pct=0
 n=0
 while [ "$1" ]; do
     if [[ "$1" =~ -help ]]; then
 	usage 0
     elif [[ "$1" =~ ^-{0,1}[0-9]*$ ]]; then
-	COORDINATES+="$1 "
+	coordinates+="$1 "
 	let n++
 	shift
     elif [ "$1" == "-icbm" ]; then
-	ICBM=set
+	icbm=set
 	shift
     elif [ "$1" == "-vox" ]; then
-	VOX=set
+	vox=set
 	shift
     elif [ "$1" == "-a" ]; then
-	if [ ${2:${#2}-1:1} == "%" ]; then PCT=${2%\%}; shift; fi
-	ATLAS=("${ATLAS_DECODER[$2]}")
-	if [ ! "$ATLAS" ]; then echo "ERROR: $2 is not a valid atlas code" >&2; exit 1; fi
+	if [ ${2:${#2}-1:1} == "%" ]; then pct=${2%\%}; shift; fi
+	atlas=("${atlas_decoder[$2]}")
+	if [ ! "$atlas" ]; then echo "ERROR: $2 is not a valid atlas code" >&2; exit 1; fi
 	shift 2
     else 
 	echo "UNRECOGNIZED ARGUMENT: $1" >&2
@@ -93,16 +93,16 @@ fi
 [ $e ] && usage
 
 # retrieve label
-if [ ! "$ATLAS" ]; then
+if [ ! "$atlas" ]; then
     # convert to talairach coordinates
-    [ $ICBM ] && t=($(icbm_mni2tal ${COORDINATES})) || t=($(mni2tal ${COORDINATES}))
+    [ $icbm ] && t=($(icbm_mni2tal ${coordinates})) || t=($(mni2tal ${coordinates}))
 
 
     # submit to talairach daemon
     tdoutput="$(tdquery ${t[*]} localhost)"; let tries++
     # resubmit until there's no error
     until [ $(echo $tdoutput | grep -icE "error: td call failed|exception") -eq 0 ]; do
-	[ $tries -ge $MAXTRIES ] && break
+	[ $tries -ge $maxtries ] && break
 	echo "retrying Talairach Daemon" >&2
 	tdoutput="$(tdquery ${t[*]} localhost)"; let tries++
 	sleep 1
@@ -144,9 +144,9 @@ else
 	if [[ "$pct" =~ [^0-9] ]]; then
 	    label+=" $pct $region;"
 	else
-	    [ $pct -ge $PCT ] && label+=" ${pct}% ${region};"
+	    [ $pct -ge $pct ] && label+=" ${pct}% ${region};"
 	fi
-    done < <(atlasquery -a "$ATLAS" -c ${COORDINATES// /,} | sed -e 's|.*<br>||' -e 's|, \([0-9]*%\)|\n\1|g' -e 's|,|:|g' -e 's|%||g')
+    done < <(atlasquery -a "$atlas" -c ${coordinates// /,} | sed -e 's|.*<br>||' -e 's|, \([0-9]*%\)|\n\1|g' -e 's|,|:|g' -e 's|%||g')
     echo $label | sed -e 's|^ ||' -e 's|;$||'
 fi
 

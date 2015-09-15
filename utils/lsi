@@ -51,40 +51,39 @@ NOTE: fslstats will treat all NaNs as 0s (-n option)
     exit ${1:-1}
 }
 
+[[ " $* " =~ " "-*help" " ]] && usage 0
 
 ### SET DEFAULTS
-DIM=set
+dim=set
 ### PARSE ARGUMENTS
 args="$(echo $* | tr ' ' '\n' | grep "^-")"
 while [ "$1" ]; do
-    if [[ "$1" =~ help$ ]]; then
-	usage 0
-    elif [ -d "$1" ]; then
+    if [ -d "$1" ]; then
 	for i in $(ls $1/*.{img,nii.gz,nii} 2> /dev/null); do
-	    IMAGES+=($i)
+	    images+=($i)
 	done
     elif [ -f "$1" ]; then	
-	[ $(imtest $1) -eq 1 ] && IMAGES+=($1)
+	[ $(imtest $1) -eq 1 ] && images+=($1)
     elif [ "$1" == "-d" ]; then
-	PIXDIM=set
+	pixdim=set
     elif [ "$1" == "-V" ]; then
-	VOLUMEnz=set
+	volumenz=set
     elif [ "$1" == "-v" ]; then
-	VOLUME=set
+	volume=set
     elif [ "$1" == "-M" ]; then
-	MEAN=set
+	mean=set
     elif [ "$1" == "-R" ]; then
-	RANGE=set
+	range=set
     elif [ "$1" == "-ft" ]; then
-	FILETYPE=set
+	filetype=set
     elif [ "$1" == "-dt" ]; then
-	DATATYPE=set
+	datatype=set
     elif [ "$1" == "--all" ]; then
-	ALL=set
+	all=set
     elif [ "$1" == "--no-dim" ]; then       
-	unset DIM
+	unset dim
     elif [ "$1" == "--h" ]; then
-	HEADER=set
+	header=set
     else
 	echo "UNRECOGNIZED OPTION: $1" >&2
 	usage
@@ -93,16 +92,16 @@ while [ "$1" ]; do
 done	
 
 #if [ ! $1 ]||[ ${1:0:1} == "-" ]; then lsi . $*; exit 0; fi
-if [ ! -n "${IMAGES[*]}" ]; then 
+if [ ! -n "${images[*]}" ]; then 
     for i in $(ls ./*.{img,nii.gz,nii} 2> /dev/null); do
-	IMAGES+=($i)
+	images+=($i)
     done
 fi
 
 ### MAIN
 
 # find longest image name string
-wname=$(for i in ${IMAGES[*]}; do echo ${#i}; done | sort -n | tail -1)
+wname=$(for i in ${images[*]}; do echo ${#i}; done | sort -n | tail -1)
 wdim=6
 wpixdim=9
 wnzvolvox=9
@@ -115,39 +114,39 @@ wdatatype=10
 wfiletype=10
 
 
-if [ $ALL ]||[ $HEADER ]; then
+if [ $all ]||[ $header ]; then
     printf "%-${wname}s  " IMAGE
 
-    if [ $FILETYPE ]; then
-	printf " %${wdatatype}s" filetype
+    if [ $filetype ]; then
+	printf " %${wdatatype}s" FILETYPE
     fi
-    if [ $DATATYPE ]; then
-	printf " %${wdatatype}s" data_type
+    if [ $datatype ]; then
+	printf " %${wdatatype}s" DATA_TYPE
     fi
-    if [ $PIXDIM ]; then
+    if [ $pixdim ]; then
 	#printf "%${wpixdim}s" Xmm Ymm Zmm Tval
-	printf "%${wpixdim}s" pixdim{1,2,3,4}
+	printf "%${wpixdim}s" PIXDIM{1,2,3,4}
     fi
-    if [ $DIM ]; then
+    if [ $dim ]; then
 	#printf "%${wdim}s" X Y Z T
-	printf "%${wdim}s" dim{1,2,3,4}
+	printf "%${wdim}s" DIM{1,2,3,4}
     fi
-    if [ $ALL ]||[ $VOLUMEnz ]; then
+    if [ $all ]||[ $volumenz ]; then
 	printf " %${wnzvolvox}s" VOXELS
     fi
-    if [ $VOLUME ]; then
+    if [ $volume ]; then
 	printf " %${wnzvolmm}s" mm^3
     fi
-    if [ $VOLUMEnz ]; then
+    if [ $volumenz ]; then
 	printf " %${wvolvox}s" allVOXELS
     fi
-    if [ $VOLUME ]; then
+    if [ $volume ]; then
 	printf " %${wvolmm}s" allmm^3
     fi
-    if [ $ALL ]||[ $MEAN ]; then
+    if [ $all ]||[ $mean ]; then
 	printf " %${wmean}s" MEAN
     fi
-    if [ $ALL ]||[ $RANGE ]; then
+    if [ $all ]||[ $range ]; then
 	printf " %${wrange}s" MIN MAX
     fi
 
@@ -156,35 +155,35 @@ if [ $ALL ]||[ $HEADER ]; then
 fi
 
 # loop through images
-for image in ${IMAGES[*]}; do
+for image in ${images[*]}; do
     # print image name
     printf "%-${wname}s  " ${image//\/\//\/}
 
     # print additional stats
-    if [ $FILETYPE ]; then
+    if [ $filetype ]; then
 	fslinfo $image | awk '/file_type/ {printf(" %'${wfiletype}'s",$2)}'
     fi
-    if [ $DATATYPE ]; then
+    if [ $datatype ]; then
 	fslinfo $image | awk '/data_type/ {printf(" %'${wdatatype}'s",$2)}'
     fi
-    if [ $PIXDIM ]; then
+    if [ $pixdim ]; then
 	#printf "%${wpixdim}.3f" $(for d in 1 2 3; do fslval $image pixdim$d; done)
 	fslinfo $image | awk '/pixdim[1-4]/ {printf("%'${wpixdim}'.3f",$2)}'
     fi
-    if [ $DIM ]; then
+    if [ $dim ]; then
 	#printf "%${wdim}d" $(for d in 1 2 3 4; do fslval $image dim$d; done)
 	fslinfo $image | awk '/^dim[1-4]/ {printf("%'${wdim}'d",$2)}'
     fi
-    if [ $ALL ]||[ $VOLUMEnz ]; then
+    if [ $all ]||[ $volumenz ]; then
 	printf " %${wnzvolvox}.0f %${wnzvolmm}.2f" $(fslstats $image -n -V)
     fi
-    if [ $VOLUME ]; then
+    if [ $volume ]; then
 	printf " %${wvolvox}.0f %${wvolmm}.2f" $(fslstats $image -n -v)
     fi
-    if [ $ALL ]||[ $MEAN ]; then
+    if [ $all ]||[ $mean ]; then
 	printf " %${wmean}.2f" $(fslstats $image -n -M)
     fi
-    if [ $ALL ]||[ $RANGE ]; then
+    if [ $all ]||[ $range ]; then
 	printf " %${wrange}.2f" $(fslstats $image -n -R)
     fi
 

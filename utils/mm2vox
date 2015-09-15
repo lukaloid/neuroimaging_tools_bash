@@ -6,11 +6,11 @@ usage() {
     exit ${1:-1}
 }
 
-[[ "$*" =~ -help ]] && usage 0
+[[ " $* " =~ " "-*help" " ]] && usage 0
 if [ $# -ne 3 ] || [[ "$*" =~ [^0-9-.\ ] ]]; then usage; fi
 
-MNI_BRAIN=$(findMNI)
+mni_brain=$(findMNI)
 
-echo $1 $2 $3 | std2imgcoord -std $MNI_BRAIN -img $MNI_BRAIN -vox | awk '{print $1,$2,$3}'
+echo $1 $2 $3 | std2imgcoord -std $mni_brain -img $mni_brain -vox | awk '{print $1,$2,$3}'
 
 exit 0

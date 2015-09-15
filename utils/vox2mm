@@ -7,7 +7,7 @@ usage() {
     exit ${1:-1}
 }
 
-[[ "$*" =~ -help ]] && usage 0
+[[ " $* " =~ " "-*help" " ]] && usage 0
 [ $# -ne 3 ] && usage
 if [[ "$*" =~ [^0-9.\ ] ]] && [[ "$*" =~ - ]]; then 
     echo "no negative numbers"
@@ -15,9 +15,9 @@ if [[ "$*" =~ [^0-9.\ ] ]] && [[ "$*" =~ - ]]; then
 fi
 
 
-MNI_BRAIN=$(findMNI)
+mni_brain=$(findMNI)
 
-echo $1 $2 $3 | img2stdcoord -std $MNI_BRAIN -img $MNI_BRAIN | awk '{print $1,$2,$3}'
+echo $1 $2 $3 | img2stdcoord -std $mni_brain -img $mni_brain | awk '{print $1,$2,$3}'
 
 
 exit 0
