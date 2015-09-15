@@ -138,6 +138,12 @@ case $OPT in
     
     "-o")
 	awk '$2 ~ /fmri\(outputdir\)/ {gsub ("\"","",$3); print $3}' $FSF;;
+    
+    "-im")
+	fsfinfo -m $(fsfinfo -1i $FSF);;
+
+    "-lm")
+	fsfinfo -m $(fsfinfo -1l $FSF);;
 
     "-m")
 	if [ $type -eq 1 ]; then
