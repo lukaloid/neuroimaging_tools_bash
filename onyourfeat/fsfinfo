@@ -232,6 +232,20 @@ case $opt in
 	    done
 	fi;;
 
+    "-allcon" | "-allcons")
+	level=$(fsfinfo -level $fsf)
+	echo "CONTRASTS (-con)"
+	fsfinfo -con $fsf
+	if [ $level -gt 1 ]; then
+	    printf "\nINPUT CONTRASTS (-1icon)\n"
+	    fsfinfo -1icon $fsf
+	fi
+	if [ $level -eq 3 ]; then
+	    printf "\nLOWER LEVEL CONTRASTS (-1lcon)\n"
+	    fsfinfo -1lcon $fsf
+	fi
+	;;
+
     "-con" | "-hcon")
 	sed -n 's|.*fmri(conname_real\.\(.*\)) \"\(.*\)\"|contrast \1 \2|p' $fsf;;
 
