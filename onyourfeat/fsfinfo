@@ -23,6 +23,7 @@ Options:
          -o             output directory name
          -m             view model
          -con           contrast names (real)
+         -allcon        contrast names for indicated analysis AND all input analyses (and their inputs...)
          -cono          contrast names (orig)
          -ev            EV names
          -evfiles       EV filenames (in lower levels)
