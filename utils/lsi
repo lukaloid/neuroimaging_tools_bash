@@ -104,8 +104,8 @@ fi
 wname=$(for i in ${images[*]}; do echo ${#i}; done | sort -n | tail -1)
 wdim=6
 wpixdim=9
-wnzvolvox=9
-wnzvolmm=11
+wnzvolvox=10
+wnzvolmm=12
 wvolvox=$(echo $wnzvolvox + 3 | bc)
 wvolmm=$(echo $wnzvolmm + 3 | bc)
 wmean=8
@@ -133,14 +133,10 @@ if [ $all ]||[ $header ]; then
     fi
     if [ $all ]||[ $volumenz ]; then
 	printf " %${wnzvolvox}s" VOXELS
-    fi
-    if [ $volume ]; then
 	printf " %${wnzvolmm}s" mm^3
     fi
-    if [ $volumenz ]; then
-	printf " %${wvolvox}s" allVOXELS
-    fi
     if [ $volume ]; then
+	printf " %${wvolvox}s" allVOXELS
 	printf " %${wvolmm}s" allmm^3
     fi
     if [ $all ]||[ $mean ]; then
