@@ -4,16 +4,11 @@
 maxtries=3
 
 ### setup atlases (1-indexed)
-atlas_decoder=(\
-"" \
-"Harvard-Oxford Cortical Structural Atlas" \
-"Harvard-Oxford Subcortical Structural Atlas" \
-"JHU ICBM-DTI-81 White-Matter Labels" \
-"JHU White-Matter Tractography Atlas" \
-"Juelich Histological Atlas" \
-"MNI Structural Atlas" \
-"Oxford Thalamic Connectivity Probability Atlas" \
-)
+i=1
+while read a; do
+    atlas_decoder[i]="$a"
+    let i++
+done < <(atlasquery --dumpatlases)
 
 usage () {
     echo "
@@ -36,7 +31,7 @@ ATLAS CODES:"
     done
 
     exit ${1:-1}
-}
+} >&2
 
 [[ " $* " =~ " "-*help" " ]] && usage 0
 
