@@ -59,7 +59,7 @@ tdquery() {
 ### PARSE ARGUMENTS
 # read in coordinates (must be first three arguments)
 n=0
-while [ "$1" ]&&[[ "$1" =~ ^[0-9]*$ ]]; do
+while [ "$1" ]&&[[ "$1" =~ ^[0-9-]*$ ]]; do
     coordinates+="$1 "
     let n++
     shift
