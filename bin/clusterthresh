@@ -108,18 +108,18 @@ done
 # determine output filename
 if [ ! $fout ]; then
     if [ $idx ]; then
-	fout=$map_clusters_idx
+	fout=$map__clusters_idx
     elif [ $bin ]; then
-	fout=$map_clusters_bin
+	fout=$map__clusters_bin
     elif [ $table ]; then
-	fout=$map_clusters_bins
+	fout=$map__clusters_bins
     else
-	fout=$map_clusters
+	fout=$map__clusters
     fi
 fi
 	
 ### SETUP
-wd=$(mktemp -d "${TMPDIR:-/tmp}/clustertable.XXXX") || mktempfail
+wd=$(mktemp -d "${TMPDIR:-/tmp}/clusterthresh.XXXX") || mktempfail
 [ $debug ] && echo working directory: $wd
 
 
