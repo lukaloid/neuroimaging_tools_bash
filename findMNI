@@ -29,7 +29,7 @@ elif [[ "$1" =~ 2 ]]; then
 elif [[ "$1" =~ -1 ]]; then
     ls $FSLDIR/*/*/MNI152_T1_1mm_brain.*[zr] | head -1
 elif [[ "$1" =~ -.5 ]]; then
-    ls $(dirname $0)/imagefiles/MNI152_T1_0.5mm_brain.nii.gz
+    ls $(dirname $0)/MNI152_T1_0.5mm_brain.nii.gz
 else
     [ "$1" ] && echo "UNRECOGNIZED ARGUMENT: $1"
     usage
