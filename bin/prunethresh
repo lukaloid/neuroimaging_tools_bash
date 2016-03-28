@@ -36,7 +36,7 @@ mktempfail() {
 # PARSE ARGUMENTS
 [[ $* =~ -help$ ]] && usage 0
 fin=$1; shift
-if [ ! $fin ]||[ ! -f $fin ]||[ $(imtest $fin) == 0 ]; then
+if [ ! $fin ]||[ $(imtest $fin) == 0 ]; then
     echo "No such image file: $fin"
     exit 1
 fi
@@ -106,10 +106,10 @@ fslmaths $wd/fin -abs $wd/fin_abs
 
 [ $v ] && echo "... MAKING THRESHOLD LAYERS"
 for ((i=0; i<${#vthresh[*]}; i++)); do
-    clusterthresh $wd/fin_abs -t $(echo ${vthresh[i]} | awk '{print 1-$1}') -c ${cthresh[i]} -o $wd/c_${i} >/dev/null
+    clusterthresh $wd/fin_abs -t ${vthresh[i]} -c ${cthresh[i]} -o $wd/c_${i} >/dev/null
 done
 # top threshold is already "pruned", can be absolute valued and binarized
-clusterthresh $wd/fin_abs -t $(echo $maxvthresh | awk '{print 1-$1}') -c $maxcthresh -o $wd/pruned >/dev/null
+clusterthresh $wd/fin_abs -t $maxvthresh -c $maxcthresh -o $wd/pruned >/dev/null
 fslmaths $wd/pruned -abs -bin $wd/pruned
 
 [ $v ] && echo "... INDEXIFYING CLUSTERS"
