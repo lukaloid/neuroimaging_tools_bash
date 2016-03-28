@@ -1,0 +1,25 @@
+#!/bin/bash
+# AUTHOR: Luka Ruzic
+
+usage() {
+	echo "USAGE: pruneview <pruned image> (see prunethresh)
+DESCRIPTION: opens prunethresh outputs nicely in FSLview
+"
+exit ${1:-1}
+
+} >&2
+
+img=$1
+
+[[ "$@" =~ -help$ ]] && usage 0
+
+if [ ! $img ]||[ $(imtest $img) -eq 0 ]; then
+    echo "ERROR: insufficient input"
+    usage
+fi
+
+cmd="fslview $(findMNI) $img -l Red-Yellow -b .9,2.5 $img -l Blue-Lightblue -b -.9,-2.5"
+echo $cmd
+eval $cmd
+
+exit 0
