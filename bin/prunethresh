@@ -15,7 +15,7 @@ OPTIONS:
          same as -t but assumes inverse p map (will apply 1-vThr)
    -o <outputfilename>  (DEFAULT: <image>__pruned)
    -view
-         open result in fslview when complete (see pruneview)
+         open result in fslview (see pruneview)
    -v
          verbose
 DEFAULTS:
@@ -35,24 +35,24 @@ mktempfail() {
 
 # PARSE ARGUMENTS
 [[ $* =~ -help$ ]] && usage 0
-FIN=$1; shift
-if [ ! $FIN ]||[ ! -f $FIN ]||[ $(imtest $FIN) == 0 ]; then
-    echo "No such image file: $FIN"
+fin=$1; shift
+if [ ! $fin ]||[ ! -f $fin ]||[ $(imtest $fin) == 0 ]; then
+    echo "No such image file: $fin"
     exit 1
 fi
 
-FOUT=$(remove_ext $FIN)__pruned
+fout=$(remove_ext $fin)__pruned
 
-if [ "fslstats $FIN -R | awk '$1>-1 && $2<1'" ]; then
-    MAXVTHRESH=.001
-    MAXCTHRESH=3
-    VTHRESH=(.005 .01)
-    CTHRESH=(1 1)
+if [ "fslstats $fin -R | awk '$1>-1 && $2<1'" ]; then
+    maxvthresh=.001
+    maxcthresh=3
+    vthresh=(.005 .01)
+    cthresh=(1 1)
 else
-    MAXVTHRESH=3.29
-    MAXCTHRESH=3
-    VTHRESH=(2.58 1.96)
-    CTHRESH=(1 1)
+    maxvthresh=3.29
+    maxcthresh=3
+    vthresh=(2.58 1.96)
+    cthresh=(1 1)
 fi
 
 while [ $1 ]; do
@@ -61,25 +61,25 @@ while [ $1 ]; do
 	    echo "-t argument is malformed (must be followed by pairs of voxel intensity and cluster extent thresholds)"
 	    usage
 	fi
-	unset VTHRESH CTHRESH
-	MAXVTHRESH=$2
-	MAXCTHRESH=$3
+	unset vthresh cthresh
+	maxvthresh=$2
+	maxcthresh=$3
 	shift 2
 	while [ $2 ]&&[ ${2:0:1} != "-" ]; do
 	    if [ ! $3 ]||[ ${3:0:1} == "-" ]; then
 		echo "-t argument is malformed (must be followed by pairs of voxel intensity and cluster extent thresholds)"
 		usage
 	    fi
-	    VTHRESH+=($2)
-	    CTHRESH+=($3)
+	    vthresh+=($2)
+	    cthresh+=($3)
 	    shift 2
 	done
     elif [ $1 == "-o" ]; then
-	FOUT=$2
+	fout=$2
     elif [ $1 == "-view" ]; then
-	VIEW=set
+	view=set
     elif [ $1 == "-v" ]; then
-	V=set
+	v=set
     else
 	echo UNRECOGNIZED ARGUMENT: $1
 	exit 1
@@ -91,8 +91,8 @@ done
 
 ### MAKE TEMPORARY WORKING DIRECTORY
 wd=$(mktemp -d "${TMPDIR:-/tmp}/prunethresh.XXXX") || mktempfail
-[ $V ] && echo "... MAKING COPY IN TEMPORARY WORKING DIRECTORY $wd"
-fslmaths $FIN $wd/fin
+[ $v ] && echo "... MAKING COPY IN TEMPORARY WORKING DIRECTORY $wd"
+fslmaths $fin $wd/fin
 
 # sign mask
 clusterthresh $wd/fin -t 0 -v 1 -b -o $wd/sign >/dev/null
@@ -100,22 +100,22 @@ clusterthresh $wd/fin -t 0 -v 1 -b -o $wd/sign >/dev/null
 fslmaths $wd/fin -abs $wd/fin_abs
 
 
-[ $V ] && echo "... MAKING THRESHOLD LAYERS"
-for ((i=0; i<${#VTHRESH[*]}; i++)); do
-    clusterthresh $wd/fin_abs -t $(echo ${VTHRESH[i]} | awk '{print 1-$1}') -v ${CTHRESH[i]} -o $wd/c_${i} >/dev/null
+[ $v ] && echo "... MAKING THRESHOLD LAYERS"
+for ((i=0; i<${#vthresh[*]}; i++)); do
+    clusterthresh $wd/fin_abs -t $(echo ${vthresh[i]} | awk '{print 1-$1}') -v ${cthresh[i]} -o $wd/c_${i} >/dev/null
 done
 # top threshold is already "pruned", can be absolute valued and binarized
-clusterthresh $wd/fin_abs -t $(echo $MAXVTHRESH | awk '{print 1-$1}') -v $MAXCTHRESH -o $wd/pruned >/dev/null
+clusterthresh $wd/fin_abs -t $(echo $maxvthresh | awk '{print 1-$1}') -v $maxcthresh -o $wd/pruned >/dev/null
 fslmaths $wd/pruned -abs -bin $wd/pruned
 
-[ $V ] && echo "... INDEXIFYING CLUSTERS"
+[ $v ] && echo "... INDEXIFYING CLUSTERS"
 for i in $wd/c_*; do
     cluster -i $i -t .00001 -o $(remove_ext $i)__ind > /dev/null
 done
 
 
-[ $V ] && echo "... PRUNING"
-n=${#VTHRESH[*]}
+[ $v ] && echo "... PRUNING"
+n=${#vthresh[*]}
 for i in $wd/*__ind.*; do
     fslmaths $i -mul $wd/pruned ${i/__ind/__keep}
     { 
@@ -127,13 +127,13 @@ for i in $wd/*__ind.*; do
 done
 
 
-[ $V ] && echo "... MERGING PRUNED LAYERS"
-mxthr=$(echo 1 + ${#VTHRESH[*]} | bc)
-fslmaths $wd/pruned -mul $mxthr $(for i in $wd/*__prunemask.*; do echo " -max "$i; done) -mul $wd/sign $FOUT
+[ $v ] && echo "... MERGING PRUNED LAYERS"
+mxthr=$(echo 1 + ${#vthresh[*]} | bc)
+fslmaths $wd/pruned -mul $mxthr $(for i in $wd/*__prunemask.*; do echo " -max "$i; done) -mul $wd/sign $fout
 
 
 ### open in fslview
-[ $VIEW ] && pruneview $FOUT
+[ $view ] && pruneview $fout
 
 
 ### clean up
