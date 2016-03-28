@@ -1,6 +1,6 @@
 | utilities | |
 | :--- | :--- | :--- |
-| `lsi` | ("list images") tabulate images along with output from `fslinfo` and `fslstats` |
+| `lsi` | ("list images") tabulate image files along with output from `fslinfo` and `fslstats` |
 | `mm2label` | get labels from FSL atlases and Talairach Daemon<sup>1</sup> |
 | `mm2vox`, `vox2mm` | convert MNI millimeter cooridinates to MNI voxel coordinates and vice versa (simplifies `img2stdcoord`, etc) |
 | `mni2tal` | convert from MNI to Talairach coordinates (mm) |
@@ -11,6 +11,10 @@
 
 <sup>2</sup> I've come across some suspicious behavior from this (e.g., correlation coeffs >1 (rounding errors?)), use with caution!
 
+| cluster tools | |
+| :--- | :--- |
+| `clustertable` | produce a table of clusters in an image (extends `cluster`) |
+| `clusterthresh` | make cluster-based image files in various ways (binarized, indexed, ...) |
 
 | FEAT tools | |
 | :--- | :--- |
