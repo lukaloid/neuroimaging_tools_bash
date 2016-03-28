@@ -56,9 +56,9 @@ else
 fi
 
 while [ $1 ]; do
-    if [ $1 == -t ]; then
+    if [ $1 == "-t" ]||[ $1 == "-p" ]; then
 	if [ ! $2 ]||[ ${2:0:1} == "-" ]||[ ! $3 ]||[ ${3:0:1} == "-" ]; then
-	    echo "-t argument is malformed (must be followed by pairs of voxel intensity and cluster extent thresholds)"
+	    echo "$1 argument is malformed (must be followed by pairs of voxel intensity and cluster extent thresholds)"
 	    usage
 	fi
 	unset vthresh cthresh
@@ -74,6 +74,10 @@ while [ $1 ]; do
 	    cthresh+=($3)
 	    shift 2
 	done
+	if [ $1 == "-p" ]; then
+	    #for ((i=0; i<${vthresh[*]}; i++)); do vthresh[i]=$(echo 1 - ${vthresh[i]} | bc); done
+	    vthresh=($(echo ${vthresh[*]} | tr ' ' '\n' | awk '{print 1-$1}'))
+	fi
     elif [ $1 == "-o" ]; then
 	fout=$2
     elif [ $1 == "-view" ]; then
@@ -95,17 +99,17 @@ wd=$(mktemp -d "${TMPDIR:-/tmp}/prunethresh.XXXX") || mktempfail
 fslmaths $fin $wd/fin
 
 # sign mask
-clusterthresh $wd/fin -t 0 -v 1 -b -o $wd/sign >/dev/null
+clusterthresh $wd/fin -t 0 -c 1 -bin -o $wd/sign >/dev/null
 # absolute value
 fslmaths $wd/fin -abs $wd/fin_abs
 
 
 [ $v ] && echo "... MAKING THRESHOLD LAYERS"
 for ((i=0; i<${#vthresh[*]}; i++)); do
-    clusterthresh $wd/fin_abs -t $(echo ${vthresh[i]} | awk '{print 1-$1}') -v ${cthresh[i]} -o $wd/c_${i} >/dev/null
+    clusterthresh $wd/fin_abs -t $(echo ${vthresh[i]} | awk '{print 1-$1}') -c ${cthresh[i]} -o $wd/c_${i} >/dev/null
 done
 # top threshold is already "pruned", can be absolute valued and binarized
-clusterthresh $wd/fin_abs -t $(echo $maxvthresh | awk '{print 1-$1}') -v $maxcthresh -o $wd/pruned >/dev/null
+clusterthresh $wd/fin_abs -t $(echo $maxvthresh | awk '{print 1-$1}') -c $maxcthresh -o $wd/pruned >/dev/null
 fslmaths $wd/pruned -abs -bin $wd/pruned
 
 [ $v ] && echo "... INDEXIFYING CLUSTERS"
