@@ -23,6 +23,8 @@
 | :--- | :--- |
 | `imagethresher` | voxelwise, clusterwise thresholding of stat maps in various ways (binarized, indexed, pruned, ...) |
 | `clustertable` | produce a table of clusters in an image (extends `cluster`) |
+| `mkmask` | make spherical, cubic masks in MNI space |
+| `mkatlasmask` | make masks based on atlases available in FSL |
 
 #### FEAT tools
 | | |
