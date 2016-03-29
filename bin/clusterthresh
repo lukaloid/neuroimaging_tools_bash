@@ -3,18 +3,18 @@
 
 usage() {
     echo "
-USAGE: clusterthresh <input_map> [options]
+USAGE: imagethresher <input_map> [options]
 DESCRIPTION: applies voxel intensity and cluster size thresholds to <input_map>
 OPTIONS:
  Thresholding:
-   -t <i> [...]  do clustering with a voxel threshold of intensity <i>  (DEFAULT: 2.58)
-   -p <p> [...]  do clustering with a voxel threshold of intensity 1-<p>
-   -c <v> [...]  apply a cluster size threshold of <v> voxels  (DEFAULT: 1)
-   note: use EITHER -t OR -p
+   -t <i> [...]  threshold voxels at intensity <i>  (DEFAULT: 2.58)
+   -p <p> [...]  threshold voxels at intensity 1-<p> (for inverse p maps)
+   -c <v> [...]  threshold clusters at size <v> voxels  (DEFAULT: 1, i.e. no thresholding)
+   note: use EITHER -t OR -p, not both
    note: if multiple thresholds are given, will use -multi mode
            (must give same number of -c and -t/-p thresholds)
  Modes:
-   Default:         remaining voxels retain value
+   -thresh          remaining voxels retain value (DEFAULT)
    -bin             binarize results
    -index           index results (each cluster a different integer intensity, numbered by size) 
                     (positive intensities only)
@@ -106,9 +106,13 @@ while [ $1 ]; do
 	    shift
 	done
 	shift
+    elif [  $1 == "-thresh" ]; then
+	thresh=set
+	unset idx bin
+	shift
     elif [ $1 == "-bin" ]; then
 	bin=set
-	unset idx
+	unset idx thresh
 	shift
     elif [ $1 == "-index" ]; then
 	idx=set
@@ -137,7 +141,7 @@ while [ $1 ]; do
 done
 
 # make temporary working directory
-wd=$(mktemp -d "${TMPDIR:-/tmp}/clusterthresh.XXXX") || mktempfail
+wd=$(mktemp -d "${TMPDIR:-/tmp}/imagethresher.XXXX") || mktempfail
 [ $debug ] && echo working directory: $wd
 
 # if multiple thresholds given, write table
@@ -182,16 +186,16 @@ if [ $prune ]; then
     exit 0
 
 elif [ $multi ]; then
-    # produce clusterthresh'd maps according to $table
+    # produce imagethresher'd maps according to $table
     i=0;
     while read t v; do
 	let i++
 	#printf "%2d %9.4f %5d\n" $i $t $v
-	clusterthresh $map -t $t -c $v -bin -o $wd/map$i > /dev/null
+	imagethresher $map -t $t -c $v -bin -o $wd/map$i > /dev/null
     done < <(grep -vE "^ *#|^ *$" $table | sort -n -k 1)  # ignore comments and blank lines
     let n=i
 
-    # merge clusterthresh'd maps
+    # merge imagethresher'd maps
     fslmaths $map -mul 0 $fout
     for i in $(seq $n); do
 	fslmaths $wd/map$i -add $fout $fout
