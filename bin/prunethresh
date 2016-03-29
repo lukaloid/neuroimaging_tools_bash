@@ -41,7 +41,7 @@ if [ ! $fin ]||[ $(imtest $fin) == 0 ]; then
     exit 1
 fi
 
-fout=$(remove_ext $fin)__pruned
+fout=$(remove_ext $fin)__clusters_pruned
 
 if [ "fslstats $fin -R | awk '$1>-1 && $2<1'" ]; then
     maxvthresh=.001
