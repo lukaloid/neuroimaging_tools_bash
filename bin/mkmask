@@ -1,0 +1,191 @@
+#!/bin/bash
+# Author: Luka Ruzic
+
+
+usage() {
+    echo "USAGE: mkmask <x> <y> <z> [<d>] [options]
+DESCRIPTION:
+  create spherical mask in MNI space
+    with <d> MNI voxels along the in-plane diameter (odd integers only) (DEFAULT: 5)
+    centered on MILLIMETER coordinates <x> <y> <z>
+OPTIONS:
+  -sphere (DEFAULT)
+      make a sphere (use <d> as )
+  -cube
+      make a cube (use <d> as edge length)
+  -o <filename>
+      output file will be named <filename>.nii.gz (DEFAULT: <shape>_<x>_<y>_<z>_<d>.nii.gz)
+  -reg <feat>
+      use the registration directory of FEAT analysis <feat> to register the sphere into scanner space
+      sphere will be registered with FLIRT
+      no post-interpolation threshold will be applied
+      resulting mask will be divided by the mean to effectively re-mean the non-zero voxels to 1
+      NOTE: this is equivalent to featquery's \"do not binarise mask (allow weighting)\" option
+
+NOTE:
+  sphere (default) assumes python (with numpy and nibabel)
+" >&2
+    
+    exit ${1:-1}
+}
+
+# HIDDEN OPTIONS: 
+#  -td  # HIDDEN BECAUSE TD not installed on all systems
+#         name output file with Talairach Daemon label (ex: sphere_in_R_Anterior_Cingulate_BA25.nii.gz)
+#
+#  -vox  # HIDDEN BECAUSE user should be encouraged to do  mkmask $(vox2mm <x> <y> <z>) 
+#      interpret coordinates as MNI voxels (DEFAULT: MNI mm)
+
+
+mktempfail() {
+    echo "ERROR: mktemp failed"
+    exit 1
+}
+
+mni_brain=$(findMNI)
+
+### PARSE ARGUMENTS
+[[ "$*" =~ -help$ ]] && usage 0
+[ $# -lt 3 ] && usage
+
+
+# get coordinates
+x=$1; y=$2; z=$3; shift 3
+
+# get diameter, if it's there
+d=5 # default of 5 voxels across diameter
+if [ $1 ]&&[[ ! "$1" =~ ^- ]]; then 
+    d=$1
+    shift
+fi
+
+shape=sphere
+a=0
+while [ $1 ]; do
+    if [ $1 == "-c" ]||[ $1 == "-cube" ]; then
+	shape=cube
+	shift
+    elif [ $1 == "-sphere" ]; then
+	shape=sphere
+	shift
+    elif [ $1 == "-o" ]&&[ $2 ]; then
+	fout=$(remove_ext $2)
+	shift 2
+    elif [ $1 == "-td" ]; then
+	tdnaming=set
+	shift
+    elif [ $1 == "-reg" ]; then
+	reg=$2/reg
+	shift 2
+    elif [ $1 == "-vox" ]; then
+	vox=set
+	shift
+    else
+	echo "UNRECOGNIZED OPTION: $1"
+	usage
+    fi
+done
+
+# check on reg directory
+if [ $reg ]; then
+    if [ ! -d $reg ]; then echo "ERROR: no such directory: $reg"; usage; fi
+    for f in example_func standard2example_func.mat; do 
+	if [ ! -f $reg/$f ]&&[ $(imtest $reg/$f) -eq 0 ]; then 
+	    echo "ERROR: $reg does not contain $f"
+	    usage
+	fi
+    done
+fi
+
+# check on diameter
+if [[ "$x $y $z $d" =~ [^0-9\ .-] ]]; then
+    echo "ERROR: coordinates and diameter must be numbers"
+    exit 7
+fi
+
+if [ $(echo $d | awk '$1 {if ($1%1 || !(($1/2)%1)) print "no_good"}') ]; then
+    echo "ERROR: only odd integers acceptable for <d>"
+    exit 7
+fi
+
+# convert to voxel coordinates
+[ $vox ] && coords=($x $y $z) || coords=($(mm2vox $x $y $z))
+x=${coords[0]}
+y=${coords[1]}
+z=${coords[2]}
+
+# resolve name
+if [ $vox ]; then
+    [ ! $fout ] && fout=${shape}_${x}_${y}_${z}_d${d}vox
+else
+    [ ! $fout ] && fout=${shape}_${x}_${y}_${z}_d$(echo 2 * ${d} | bc)mm
+fi
+
+if [ $tdnaming ]; then
+    fout=${shape}_in_$(mm2label $x $y $z | awk '{print $2"_"$1"_"$3}')
+fi
+
+#[ $reg ] && fout=${fout%.nii.gz}_native
+
+# translate into radius
+r=$(echo $d | awk '{print ($1-1)/2}')
+
+# make temporary working directory
+wd=$(mktemp -d "${TMPDIR:-/tmp}/mkmask.XXXX") || mktempfail
+
+
+### MAIN
+# produce empty mask if desired
+if [ $d == 0 ]; then
+    fslmaths $(findMNI) -mul 0 $wd/tempout
+    exit 0
+fi
+
+case $shape in
+    "sphere")
+	python <<EOF
+import numpy as np
+import nibabel as nib
+from scipy.spatial.distance import euclidean
+
+# load MNI
+img = nib.load('$(findMNI)')
+d = img.get_data()
+# zero out
+d *= 0
+
+# determine search cube
+for x in xrange(${x}-${r}, ${x}+${r}+1):
+  for y in xrange(${y}-${r}, ${y}+${r}+1):
+    for z in xrange(${z}-${r}, ${z}+${r}+1):
+      d[x, y, z] = euclidean([x, y, z], [${x}, ${y}, ${z}]) <= ${r}
+
+# write
+img.to_filename('${wd}/tempout')
+EOF
+        ;;
+
+    "cube")
+	fslmaths $mni_brain -mul 0 -add 1 -roi $(echo ${coords[*]} | awk -v s=$d -v r=$r '{print $1-r,s,$2-r,s,$3-r,s,0,1}') $wd/tempout
+	;;
+
+    *) echo "ERROR: invalid shape $shape"; exit	7
+esac
+
+# registration if desired
+if [ $reg ]; then   
+    # register down
+    flirt -in $wd/tempout -out $wd/tempout_flirt -ref $reg/example_func -applyxfm -init $reg/standard2example_func.mat
+    # remean to 1 (as per FEATQUERY with "do not binarise (allow weighting)" option)
+    fslmaths $wd/tempout_flirt -div $(fslstats $wd/tempout_flirt -M) $fout
+else
+    # use fslmaths for extension-general mv
+    fslmaths $wd/tempout $fout
+fi
+
+
+### CLEAN UP
+rm -r $wd
+
+
+exit 0
