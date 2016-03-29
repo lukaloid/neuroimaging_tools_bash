@@ -99,17 +99,17 @@ wd=$(mktemp -d "${TMPDIR:-/tmp}/prunethresh.XXXX") || mktempfail
 fslmaths $fin $wd/fin
 
 # sign mask
-clusterthresh $wd/fin -t 0 -c 1 -bin -o $wd/sign >/dev/null
+imagethresher $wd/fin -t 0 -c 1 -bin -o $wd/sign >/dev/null
 # absolute value
 fslmaths $wd/fin -abs $wd/fin_abs
 
 
 [ $v ] && echo "... MAKING THRESHOLD LAYERS"
 for ((i=0; i<${#vthresh[*]}; i++)); do
-    clusterthresh $wd/fin_abs -t ${vthresh[i]} -c ${cthresh[i]} -o $wd/c_${i} >/dev/null
+    imagethresher $wd/fin_abs -t ${vthresh[i]} -c ${cthresh[i]} -o $wd/c_${i} >/dev/null
 done
 # top threshold is already "pruned", can be absolute valued and binarized
-clusterthresh $wd/fin_abs -t $maxvthresh -c $maxcthresh -o $wd/pruned >/dev/null
+imagethresher $wd/fin_abs -t $maxvthresh -c $maxcthresh -o $wd/pruned >/dev/null
 fslmaths $wd/pruned -abs -bin $wd/pruned
 
 [ $v ] && echo "... INDEXIFYING CLUSTERS"
