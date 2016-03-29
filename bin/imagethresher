@@ -1,6 +1,9 @@
 #!/bin/bash
 # Author: Luka Ruzic
 
+# TO DO:
+#  - add threshold info to image names?
+
 usage() {
     echo "
 USAGE: imagethresher <input_map> [options]
@@ -173,7 +176,7 @@ if [ ! $fout ]; then
     elif [ $prune ]; then
 	fout=${map}__cluster_pruned
     else
-	fout=${map}__clusters
+	fout=${map}__threshed
     fi
 fi
 
