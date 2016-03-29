@@ -12,12 +12,6 @@
 
 <sup>2</sup> I've come across some suspicious behavior from this (e.g., correlation coeffs >1 (rounding errors?)), use with caution!
 
-#### coordinate conversion
-| | |
-| :--- | :--- |
-| `mm2vox`, `vox2mm` | convert MNI millimeter cooridinates to MNI voxel coordinates and vice versa (simplifies `img2stdcoord`, etc) |
-| `mni2tal` | convert from MNI to Talairach coordinates (mm) |
-
 #### images, statmaps
 |  | |
 | :--- | :--- |
@@ -26,12 +20,24 @@
 | `mkmask` | make spherical, cubic masks in MNI space |
 | `mkatlasmask` | make masks based on atlases available in FSL |
 
+#### viewing images (FSLview wrappers)
+| | |
+| :--- | :--- |
+| `zview` | primarily intended for zstat overlays, but will attempt to detect several other sorts of images (binarized, indexed, etc) |
+| `fslviewdiffs` | calculate the difference between statmaps (several method options) and open in FSLview |
+| `prunethresh` | for use with `-prune` option output of `imagethresher` |
+| `tview` | for use with t stat map outputs of SPM analyses |
+
 #### FEAT tools
 | | |
 | :--- | :--- |
 | `fsfinfo` | Print properties of FEAT designs. For higher levels will retrieve properties of inputs/lower levels |
 
-
+#### coordinate conversion
+| | |
+| :--- | :--- |
+| `mm2vox`, `vox2mm` | convert MNI millimeter cooridinates to MNI voxel coordinates and vice versa (simplifies `img2stdcoord`, etc) |
+| `mni2tal` | convert from MNI to Talairach coordinates (mm) |
 
 
 
