@@ -54,14 +54,14 @@ while [ $1 ]; do
 	thr=$2
 	shift 2
     elif [ $1 == "-cort" ]; then
-        atlas="$ATLASDIR/HarvardOxford/HarvardOxford-cort-prob-2mm.nii.gz"
-	atlasxml="$ATLASDIR/HarvardOxford-Cortical.xml"
+        atlas="$atlasdir/HarvardOxford/HarvardOxford-cort-prob-2mm.nii.gz"
+	atlasxml="$atlasdir/HarvardOxford-Cortical.xml"
     elif [ $1 == "-subcort" ]; then
-        atlas="$ATLASDIR/HarvardOxford/HarvardOxford-sub-prob-2mm.nii.gz"
-	atlasxml="$ATLASDIR/HarvardOxford-Subcortical.xml"
+        atlas="$atlasdir/HarvardOxford/HarvardOxford-sub-prob-2mm.nii.gz"
+	atlasxml="$atlasdir/HarvardOxford-Subcortical.xml"
     elif [ $1 == "-mni" ]; then
-	atlas="$ATLASDIR/MNI/MNI-prob-2mm.nii.gz"
-	atlasxml="$ATLASDIR/MNI.xml"
+	atlas="$atlasdir/MNI/MNI-prob-2mm.nii.gz"
+	atlasxml="$atlasdir/MNI.xml"
     elif [ $1 == "-o" ]; then
 	userfout=$2
 	shift 2
