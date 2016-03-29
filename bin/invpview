@@ -1,0 +1,106 @@
+#!/bin/bash
+
+# colors
+C=(Red-Yellow Pink)
+C_neg=(Blue-Lightblue Cool)
+C_other=Greyscale
+# thresholding
+BMIN=.99
+BMAX=1
+# anatomical
+#MNI=$(findMNI)
+MNI=$FSLDIR/data/standard/MNI152_T1_2mm_brain.nii.gz
+ANAT_default="./invp_anatomical.nii"
+# viewer
+TRANSPARENCY=".4"
+VIEW="ortho"
+
+usage() {
+    echo "Usage: invpview [options] <map> ..."
+    echo "Description:"
+    echo "  open inverse p map(s) in fslview"
+    echo "    first map in $C / $C_neg"
+    echo "    second image in ${C[1]} / ${C_neg[1]}"
+    echo "    rest of images in $C_other"
+    echo "Options:"
+    echo "  -m"
+    echo "     include montage in FSLview (\"lightbox\")"
+    echo "     DEFAULT: orthographic only"
+    echo "  -solid"
+    echo "     display anatomical layer as solid bottom layer"
+    echo "     DEFAULT: transparent top layer"
+    echo "  -a <image>"
+    echo "     use <image> as anatomical layer"
+    echo "     DEFAULT: if 2x2x2mm, 91x109x91, use $MNI"
+    echo "              else try to use $ANAT_default"
+    echo "  -t <thresh>"
+    echo "     threshold all subsequently entered maps at <thresh>"
+    echo "     DEFAULT: .99"
+    echo "  -p <pthresh>"
+    echo "     threshold all subsequently entered maps at 1-<pthresh>"
+    echo "     DEFAULT: .01"
+    echo
+    
+    exit 1
+}
+
+n=0
+while [ $1 ]; do
+    if [[ "$1" =~ help$ ]]; then
+	usage
+    elif [ $(imtest $1) == 1 ]; then
+	s+=" "$1" -l ${C[n]:-$C_other} -b $BMIN,$BMAX"
+	s+=" "$1" -l ${C_neg[n]:-$C_other} -b -$BMIN,-$BMAX"
+	
+	mapdim="$(fslinfo $1 | awk '$1~/dim[123]/ {print $2}')"
+	if [ $ANATLAYER ]; then
+	    if [ "$mapdim" != "$(fslinfo $ANATLAYER | awk '$1~/dim[123]/ {print $2}')" ]; then
+		echo "ERROR: map $1 dimensions differ from previously input map or anatomical" >&2
+	    fi
+	else
+	    if [ "$mapdim" == "$(fslinfo $MNI | awk '$1~/dim[123]/ {print $2}')" ]; then
+		ANATLAYER=$MNI		
+	    elif [ -f $ANAT ]&&[ "$mapdim" == "$(fslinfo $ANAT | awk '$1~/dim[123]/ {print $2}')" ]; then
+		ANATLAYER=$ANAT_default
+		ANATOPTS="-b 0,$(fslstats $ANATLAYER -R | awk '{print $2}')"
+	    fi
+	fi
+	
+	let n++
+    elif [ "$1" == "-solid" ]; then
+	unset TRANSPARENCY
+    elif [ "$1" == "-t" ]; then
+	shift
+	BMIN=$1
+    elif [ "$1" == "-p" ]; then
+	shift
+	BMIN=$(echo $1 | awk '{print 1-$1}')
+    elif [ "$1" == "-a" ]; then
+	shift
+	ANATLAYER=$1
+	ANATOPTS="-b 0,$(fslstats $ANATLAYER -R | awk '{print $2}')"
+    elif [ "$1" == "-m" ]; then
+	VIEW=$VIEW",lightbox"
+    else
+	echo "UNRECOGNIZED OPTION: $1" >&2
+	exit 1
+    fi
+    shift
+done
+
+[ "$s" ] || usage
+
+if [ $ANATLAYER ]; then
+    if [ $TRANSPARENCY ]; then
+	cmd="fslview -m $VIEW $s $ANATLAYER $ANATOPTS -t $TRANSPARENCY 2> /dev/null"
+    else
+	cmd="fslview -m $VIEW $ANATLAYER $ANATOPTS -t .6 $s 2> /dev/null"
+    fi
+else
+    cmd="fslview -m $VIEW $s 2> /dev/null"
+fi
+
+echo $cmd
+eval $cmd
+
+exit 0
