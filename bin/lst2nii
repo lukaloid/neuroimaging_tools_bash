@@ -1,0 +1,86 @@
+#!/bin/bash
+
+usage() {
+    echo "
+USAGE: lst2nii <listofvoxels.lst>
+DESCRIPTION: 
+  makes an MNI space image out of a list of voxels
+  voxels are given one per line, as <X> <Y> <Z> <intensity>
+OPTIONS:
+  -o <outputname>   (DEFAULT: <listofvoxels>.nii)
+  -vox
+      use mm coordinates   (DEFAULT: voxel coordinates)
+Note: requires python (with numpy and nibabel)
+Note: currently only supports integer intensities
+"
+    exit ${1:-1}
+} >&2
+
+mktempfail() {
+    echo "ERROR: mktemp failed to procure temporary file" >&2
+    exit 7
+}
+
+[[ "$@" =~ -help$ ]] && usage 0
+
+
+### PARSE INPUTS
+# get voxel spec list
+if [ ! $1 ]||[ "${1##*.}" != "lst" ]; then
+    echo "ERROR: first argument must be .lst file"
+    exit 1
+fi
+speclist=$1
+shift
+
+# set default output filename
+fout=${speclist%.lst}
+
+# rest of options
+mm=set
+while [ $1 ]; do
+    if [ $1 == "-vox" ]; then
+	unset mm
+	shift
+    elif [ $1 == "-o" ]; then
+	fout=$2
+	shift 2
+    else
+	echo "UNRECOGNIZED ARGUMENT: $1"
+	exit 1
+    fi
+done
+
+
+### CONVERT TO VOXELS, if needed
+if [ $mm ]; then
+    wd=$(mktemp -d "${TMPDIR:-/tmp}/clusterthresh.XXXX") || mktempfail
+    cat $speclist | while read x y z i; do
+	echo $(mm2vox $x $y $z) $i
+    done > $wd/speclist.txt
+    speclist=$wd/speclist.txt
+fi
+
+
+### MAIN
+python <<EOF && echo made $fout || echo failed to make $fout
+import numpy as np
+import nibabel as nib
+
+
+img = nib.load('$(findMNI)')
+d = img.get_data()
+
+voxels = np.loadtxt('$speclist').round().astype(int)
+for v in np.atleast_2d(voxels):
+  d[v[0], v[1], v[2]] = v[3]
+
+img.to_filename('$fout')
+
+EOF
+
+
+### CLEAN UP
+[ $wd ] && rm -r $wd
+
+exit 0
