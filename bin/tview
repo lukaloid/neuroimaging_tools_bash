@@ -1,0 +1,73 @@
+#!/bin/bash
+
+# defaults
+ANATPATH=Structural/SPGR/wmprage*.nii
+LTHRESH=3.1
+HTHRESH=$(echo $LTHRESH | awk '{t=5; if ($1>5) t=$1+2; print t}')
+POSCOLORS=("Red-Yellow" "Red" "Pink")
+NEGCOLORS=("Blue-Lightblue" "Blue" "Cool")
+OTHERCOLOR="Grayscale"
+
+usage() {
+    {
+	echo "Usage: tview [options] <image> ..."
+	echo "Description:"
+	echo "  opens subject level t maps (from SPM) in fslview"
+	echo "  will attempt to find and use subject's anatomical"
+	echo "    (does so based on last-entered t map)"
+	echo "Options:"
+	echo "  -t <thresh>"
+	echo "    threshold all subsequent images at t > <thresh>"
+	echo "  -a <anat_path>"
+	echo "    will look for anatomical layer in <imagingdir>/<subdir>/<anat_path>"
+	echo "    DEFAULT $ANATPATH"
+    } >&2
+}
+
+i=0;
+while [ $1 ]; do
+    if [ $1 == "-a" ]; then
+	ANATPATH=$2
+	shift 2
+    elif [ $(imtest $1) -eq 1 ]; then
+	img=$(readlink -f $1)
+	shift
+	s+=" $img -b $LTHRESH,$HTHRESH -l ${POSCOLORS[i]:-OTHERCOLOR}"
+	s+=" $img -b -$LTHRESH,-$HTHRESH -l ${NEGCOLORS[i]:-OTHERCOLOR}"
+	let i++
+    elif [ $1 == "-t" ]; then
+	LTHRESH=$2
+	HTHRESH=$(echo $LTHRESH | awk '{t=5; if ($1>5) t=$1+2; print t}')
+	shift 2
+    else
+	echo "UNRECOGNIZED OPTION: $1"
+	exit 1
+    fi    
+done
+
+
+imagingdir=$(echo $img | sed 's|\(Imaging\)/.*|\1|')
+if [ ! "$imagingdir" ]||[ ! -d "$imagingdir" ]; then
+    echo "FAILED to find imaging directory"
+    echo "  will load without anatomical layer"
+else
+    sub=$(basename $(dirname $img))
+    if [ ! -d $imagingdir/$sub ]; then
+	echo "NO such subject directory: $imagingdir/$sub"
+	echo "  will load without anatomical layer"
+    else
+	anatomical=$(readlink -f $imagingdir/$sub/$ANATPATH)
+	if [ -f $anatomical ]; then
+	    anat="$anatomical -t .4"
+	else
+	    echo "NO such image: $anatomical"
+	    echo "  will load without anatomical layer"
+	fi
+    fi
+fi
+
+cmd="fslview $s $anat"
+echo $cmd
+eval $cmd 2> /dev/null
+
+exit 0
