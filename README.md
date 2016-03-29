@@ -5,6 +5,8 @@
 | `mm2label` | get labels from FSL atlases and Talairach Daemon<sup>1</sup> |
 | `fslmathses`<sup>2</sup> | `fslmaths` + a few operators (e.g., correlation) + functionality from `fslstats` + ability to write nested commands |
 | `findMNI` | fetches path of various standard brains |
+| `intsub` | do intensity substitution (e.g., `data[data==x] = y`)|
+| `lst2nii` | specify an image in a plain text list of voxels + intensities |
 
 <sup>1</sup> if TD is installed on your system... probably requires adjustment
 
