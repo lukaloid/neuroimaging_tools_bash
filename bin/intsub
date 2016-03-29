@@ -1,0 +1,38 @@
+#!/bin/bash
+
+usage() {
+    echo "
+USAGE: intsub <FIN.ext> <intensity_substitution_list> <FOUT>
+DESCRIPTION: intensity_substitution_list is a file containing an n x 2 list of integers
+             each row specifies an intensity substitution:
+               voxels in FIN with the first value will be set to the second value
+NOTE:  (fin must include extension (.nii, .nii.gz, etc), fout need not)
+# requires python (with numpy and nibabel)
+"
+    exit ${1:-1}
+}
+
+[[ "$@" =~ -help$ ]] && usage 0
+[ $# -ne 3 ] && usage
+
+fin=$1
+lst=$2
+fout=$3
+
+python <<EOF
+import numpy as np
+import nibabel as nib
+
+img = nib.load('$fin')
+d = img.get_data()
+
+substitutions = np.loadtxt('$lst')
+for s in np.atleast_2d(substitutions):
+  d[d==s[0]] = s[1]
+
+img.to_filename('$fout')
+
+EOF
+
+
+exit 0
