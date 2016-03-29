@@ -1,0 +1,113 @@
+#!/bin/bash
+# Author: Luka Ruzic 
+
+usage() {
+    echo "
+USAGE: mkatlasmask [options]
+DESCRIPTION:
+   Make a binary mask including voxels from regions in the
+     Harvard-Oxford cortical and subcortical atlases.
+
+ATLASES:
+   -cort <region_number> [l|r]
+      use without arguments to print table of region numbers and names
+      add the region corresponding to <region_number> in the Harvard-Oxford cortical atlas
+      optionally specify to only include portion of region in left or right hemisphere
+   -subcort <region_number> [l|r]
+      same as -cort (above) except using the Harvard-Oxford subcortical atlas
+   -mni <region_number> [l|r]
+      same as -cort (above) but using the MNI atlas (VERY general)
+OPTIONS:
+   -t <thr>
+      threshold ALL SUBSEQUENTLY listed regions at <thr> (DEFAULT: 0)
+   -o <output_filename>   (DEFAULT: <region_name>_<thr>[_<l|r>])
+
+NOTES:
+   Include more than one -cort or -subcort option to merge regions into single mask.
+" >&2
+
+    exit ${1:-1}
+}
+
+mktempfail() {
+    echo "ERROR: mktemp failed"
+    exit 1
+}
+
+[[ "$@" =~ -help$ ]] && usage 0
+[ $# -lt 1 ] && usage
+
+
+### PARSE INPUTS
+# defaults
+thr=0
+yzt="0 109 0 91 0 1"
+atlasdir=$FSLDIR/data/atlases
+if [ ! -d $atlasdir ]; then echo "Cannot find directory $atlasdir"; exit 1; fi
+wd=$(mktemp -d "${TMPDIR:-/tmp}/prunethresh.XXXX") || mktempfail
+fslmaths $(findMNI) -mul 0 $wd/mask
+
+# options
+while [ $1 ]; do
+    atlas=""
+    if [ $1 == "-t" ]; then
+	thr=$2
+	shift 2
+    elif [ $1 == "-cort" ]; then
+        atlas="$ATLASDIR/HarvardOxford/HarvardOxford-cort-prob-2mm.nii.gz"
+	atlasxml="$ATLASDIR/HarvardOxford-Cortical.xml"
+    elif [ $1 == "-subcort" ]; then
+        atlas="$ATLASDIR/HarvardOxford/HarvardOxford-sub-prob-2mm.nii.gz"
+	atlasxml="$ATLASDIR/HarvardOxford-Subcortical.xml"
+    elif [ $1 == "-mni" ]; then
+	atlas="$ATLASDIR/MNI/MNI-prob-2mm.nii.gz"
+	atlasxml="$ATLASDIR/MNI.xml"
+    elif [ $1 == "-o" ]; then
+	userfout=$2
+	shift 2
+    else
+        echo "UNRECOGNIZED OPTION: $1"
+        usage
+    fi
+
+    if [ $atlas ]; then
+	
+	if [ ! "$2" ]||[[ "$2" =~ ^- ]]; then
+	    grep '^<label index' $atlasxml | sed 's|[^"]*"\([0-9]*\)"[^>]*>\([^<]*\)<.*|\1 \2|'
+	    exit 0
+	else	    
+	    code=$2
+	    shift 2
+	    
+	    name=$(grep "<label index=\"${code}\"" $atlasxml | \
+		sed -e 's|^<[^>]*>\([^<]*\)<.*|\1|' -e 's| $||' -e 's|,||g' -e 's|[^A-Za-z0-9_-]|_|g')
+	    [ $fout ] && fout+="+"
+	    fout+=${name}
+	    
+	    if [ "$1" ]&&[[ ! "$1" =~ ^- ]]&&[[ "$1" =~ [LlRr] ]]; then
+		if [[ $1 =~ [Ll] ]]; then
+		    fout+="_L"
+		    x="46 45"
+		else
+		    fout+="_R"
+		    x="0 46"
+		fi
+		shift
+	    else
+		x="0 90"
+	    fi
+
+	    fslroi $atlas $wd/wholemask $code 1 
+	    fslmaths $wd/wholemask -thr $thr -bin -roi $x $yzt -add $wd/mask -bin $wd/mask
+	fi
+    fi
+done
+
+if [ -f $wd/mask.nii.gz ]; then
+    echo ... WRITING ${userfout:-$fout}
+    fslmaths $wd/mask ${userfout:-$fout}
+fi
+
+rm -r $wd
+
+exit 0
