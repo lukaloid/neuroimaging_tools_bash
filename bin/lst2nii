@@ -54,7 +54,7 @@ done
 
 ### CONVERT TO VOXELS, if needed
 if [ $mm ]; then
-    wd=$(mktemp -d "${TMPDIR:-/tmp}/clusterthresh.XXXX") || mktempfail
+    wd=$(mktemp -d "${TMPDIR:-/tmp}/lst2nii.XXXX") || mktempfail
     cat $speclist | while read x y z i; do
 	echo $(mm2vox $x $y $z) $i
     done > $wd/speclist.txt
