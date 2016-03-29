@@ -1,0 +1,169 @@
+#!/bin/bash
+# AUTHOR: Luka Ruzic
+
+usage() {
+    {
+	echo "Usage:   $0 [options] <target.nii.gz> <comparison.nii.gz>"
+	echo "Description:  displays the difference between two images in various ways"
+	echo "              if no map is specified, a significant voxel drift map with be produced"
+	echo "Options:"
+	echo "   -k [<dir>]"
+	echo "         keep products (default directory name: target-comparison/)"
+	echo "   -n"
+	echo "         do not display maps"
+	echo "   -v <keep directory from previous fslviewdiffs call>"
+	echo "         use to view previously produced significant voxel drift maps"
+	echo "   -sig <thresh> "
+	echo "         produce significant voxel drift map"
+	echo "         use <thresh> to determine signicant voxel drift  (DEFAULT <thresh>: 2.58)"
+	echo "   -s [<i>]"
+	echo "         produce scaled difference map (display with threshold <i> (DEFAULT: 0))"
+	echo "   -d [<i>]"
+	echo "         produce raw difference map (display with threshold <i> (DEFAULT: 0))"
+	echo "Products:"
+	echo "   significance drift:   (DEFAULT)"
+	echo "      significant_positive_gained == voxels above <thresh> only in <target>  (shown in yellow)"
+	echo "      significant_negative_gained == voxels below <thresh> only in <target>  (shown in lightblue)"
+	echo "      significant_positive_lost   == voxels above <thresh> only in <comparison>  (shown in red)"
+	echo "      significant_negative_lost   == voxels below <thresh> only in <comparison>  (shown in blue)" 
+#    echo "      (note: these are collapsed into two images if -k is set: significant_gained and significant_lost)"
+	echo "   raw_difference     <target> - <comparison>"
+	echo "   scaled_difference  (<target> - <comparison>) / <target>"
+#    echo "    -v      verbose"
+    } >&2
+
+    exit 7
+}
+
+mktempfail() {
+    echo "ERROR: mktemp failed to make temporary file" >&2
+    exit 1
+}
+
+
+### PARSE ARGUMENTS
+# set defaults
+DRIFT_THRESH=2.58
+DIFF_THRESH=0
+SCALE_THRESH=0
+# parse arguments
+while [ $1 ]; do
+#    if [ "X${1/*.nii.gz/match}" == "Xmatch" ]; then
+    if [ $(imtest $1) -eq 1 ]; then
+	IMAGE+=(${1%.nii.gz})
+	shift
+    elif [ "$1" == "-k" ]; then
+	KEEP=set
+	shift
+	if [ $1 ]&&[ ${1:0:1} != "-" ]&&[ $(imtest $1) -ne 1 ]; then
+	    KEEPDIR=$1
+	    shift
+	fi
+    elif [ "$1" == "-n" ]; then
+	NODISP=set
+	shift
+    elif [ "$1" == "-v" ]; then
+	viewcmd="fslview $(findMNI) $2/significant_pos_gained -l Yellow -b 0,1 $2/significant_pos_lost -l Red -b 0,1 $2/significant_neg_gained -l Blue-Lightblue -b 0,1 $2/significant_neg_lost -l Blue -b 0,1"
+	echo $viewcmd
+	eval $viewcmd 2> /dev/null &
+	exit 0
+    elif [ "$1" == "-sig" ]; then
+	DRIFT=set
+	shift
+	if [ $1 ]&&[ ${1:0:1} != "-" ]&&[ $(imtest $1) -ne 1 ]; then
+	    DRIFT_THRESH=$1
+	    shift
+	fi
+    elif [ "$1" == "-s" ]; then
+	SCALE=set
+	shift
+	if [ $1 ]&&[ ${1:0:1} != "-" ]&&[ $(imtest $1) -ne 1 ]; then
+	    SCALE_THRESH=$1
+	    shift
+	fi
+    elif [ "$1" == "-d" ]; then
+	DIFF=set
+	shift
+	if [ $1 ]&&[ ${1:0:1} != "-" ]&&[ $(imtest $1) -ne 1 ]; then
+	    DIFF_THRESH=$1
+	    shift
+	fi
+#    elif [ "$1" == "-v" ]; then
+#	VERBOSE=set
+#	shift
+    else
+	echo "UNRECOGNIZED OPTION: $1" >&2
+	usage
+    fi
+done
+
+
+### ERROR-CHECKING
+if [ "${#IMAGE[*]}" -ne 2 ]; then
+    echo runs with 2 and only 2 .nii.gz images
+    usage
+fi
+if [ $(fslval ${IMAGE[0]} dim1) -ne $(fslval ${IMAGE[1]} dim1) ]||\
+   [ $(fslval ${IMAGE[0]} dim2) -ne $(fslval ${IMAGE[1]} dim2) ]||\
+   [ $(fslval ${IMAGE[0]} dim3) -ne $(fslval ${IMAGE[1]} dim3) ];\
+then echo "ERROR: images must be in the same space" >&2; usage; fi
+
+# resolve issues
+[ ! $DIFF ]&&[ ! $DRIFT ]&&[ ! $SCALE ] && DRIFT=set
+[ $KEEP ]&&[ ! $KEEPDIR ] && KEEPDIR=$(echo "$(basename ${IMAGE[0]})-$(basename ${IMAGE[1]})" | sed 's|\.nii\.gz||g')
+[ $KEEP ] && mkdir -p $KEEPDIR
+
+
+### MAIN
+# setup
+WORKD=$(mktemp -d -t $(basename $0)) || mktempfail
+
+#[ "$(eval echo "\$(fslval $IMAGE dim"{1,2,3}"\)")" == "91 109 91" ] && MNI_BRAIN=$(findMNI)
+[ "$(fslinfo $IMAGE | awk '/^dim[123]/ {printf $2" "}')" == "91 109 91 " ] && MNI_BRAIN=$(findMNI)
+
+# make difference maps
+if [ $SCALE ]; then    
+    diffimage=$WORKD/scaled_difference.nii.gz
+    fslmaths ${IMAGE[0]} -sub ${IMAGE[1]} -div ${IMAGE[0]} $diffimage
+    [ ! $NODISP ] && zview $diffimage -t ${t:-0} &
+    [ $KEEP ] && cp -iv $diffimage $KEEPDIR
+fi
+
+if [ $DIFF ]; then
+    diffimage=$WORKD/raw_difference.nii.gz
+    fslmaths ${IMAGE[0]} -sub ${IMAGE[1]} $diffimage
+    [ ! $NODISP ] && zview $diffimage -t ${t:-0} &
+    [ $KEEP ] && cp -iv $diffimage $KEEPDIR
+fi
+
+if [ $DRIFT ]; then
+    # make difference maps
+    fslmaths ${IMAGE[0]}  -thr $DRIFT_THRESH -bin $WORKD/new.pos.over
+    fslmaths ${IMAGE[0]} -uthr $DRIFT_THRESH -bin $WORKD/new.pos.under
+    fslmaths ${IMAGE[1]}  -thr $DRIFT_THRESH -bin $WORKD/old.pos.over
+    fslmaths ${IMAGE[1]} -uthr $DRIFT_THRESH -bin $WORKD/old.pos.under
+    fslmaths ${IMAGE[0]} -mul -1  -thr $DRIFT_THRESH -bin $WORKD/new.neg.over
+    fslmaths ${IMAGE[0]} -mul -1 -uthr $DRIFT_THRESH -bin $WORKD/new.neg.under
+    fslmaths ${IMAGE[1]} -mul -1  -thr $DRIFT_THRESH -bin $WORKD/old.neg.over
+    fslmaths ${IMAGE[1]} -mul -1 -uthr $DRIFT_THRESH -bin $WORKD/old.neg.under
+    
+    # binarized
+    fslmaths $WORKD/new.pos.over -mul $WORKD/old.pos.under $WORKD/significant_pos_gained
+    fslmaths $WORKD/new.neg.over -mul $WORKD/old.neg.under $WORKD/significant_neg_gained
+    fslmaths $WORKD/new.pos.under -mul $WORKD/old.pos.over $WORKD/significant_pos_lost
+    fslmaths $WORKD/new.neg.under -mul $WORKD/old.neg.over $WORKD/significant_neg_lost
+    
+    #[ $KEEP ] && fslmaths $WORKD/significant_neg_gained -mul -1 -add $WORKD/significant_pos_gained $WORKD/significant_gained
+    #[ $KEEP ] && fslmaths $WORKD/significant_neg_lost -mul -1 -add $WORKD/significant_pos_lost $WORKD/significant_lost
+    
+    viewcmd="fslview $MNI_BRAIN $WORKD/significant_pos_gained -l Yellow -b 0,1 $WORKD/significant_pos_lost -l Red -b 0,1 $WORKD/significant_neg_gained -l Blue-Lightblue -b 0,1 $WORKD/significant_neg_lost -l Blue -b 0,1"
+    [ ! $NODISP ] && echo $viewcmd && eval $viewcmd 2> /dev/null &
+    
+    [ $KEEP ] && cp $WORKD/significant_{pos,neg}_{gained,lost}.nii.gz $KEEPDIR
+fi
+
+
+### WRAP UP
+if [ $KEEP ]; then echo; echo "kept products in $KEEPDIR"; fi
+
+exit 0
