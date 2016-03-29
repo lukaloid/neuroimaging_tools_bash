@@ -67,14 +67,19 @@ python <<EOF && echo made $fout || echo failed to make $fout
 import numpy as np
 import nibabel as nib
 
-
+# load MNI
 img = nib.load('$(findMNI)')
 d = img.get_data()
 
+# zero out
+d *= 0
+
+# set desired voxels
 voxels = np.loadtxt('$speclist').round().astype(int)
 for v in np.atleast_2d(voxels):
   d[v[0], v[1], v[2]] = v[3]
 
+# write
 img.to_filename('$fout')
 
 EOF
