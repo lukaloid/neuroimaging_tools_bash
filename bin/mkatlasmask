@@ -44,7 +44,7 @@ thr=0
 yzt="0 109 0 91 0 1"
 atlasdir=$FSLDIR/data/atlases
 if [ ! -d $atlasdir ]; then echo "Cannot find directory $atlasdir"; exit 1; fi
-wd=$(mktemp -d "${TMPDIR:-/tmp}/prunethresh.XXXX") || mktempfail
+wd=$(mktemp -d "${TMPDIR:-/tmp}/mkatlasmask.XXXX") || mktempfail
 fslmaths $(findMNI) -mul 0 $wd/mask
 
 # options
