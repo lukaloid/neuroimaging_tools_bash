@@ -13,14 +13,15 @@ usage() {
 Usage: clustertable <stat_map> [options]
 
 Options:
-  -t <Ithr>       clustering will be done with a voxelwise intensity threshold of <Ithr> (default: 2.58)
-  -v <Nthr>       only clusters with <Nthr> or more voxels are reported (default: 1)
-  -o <filename>   will output to <filename>.csv (DEFAULT: cluster_report_<stat_map>_t<Ithr>_v<Nthr>.csv)
+  -t <i>          clustering will be done with a voxelwise intensity threshold of <i> (default: 2.58)
+  -c <v>          only clusters with <v> or more voxels are reported (default: 1)
+  -o <filename>   will output to <filename>.csv (DEFAULT: cluster_report_<stat_map>_t<i>_v<v>.csv)
   -neg            report negative intensities (DEFAULT: only positive intensities)
   -lm             generate lines for local maxima
   -d <mm>         only report local maxima separated by <mm> (cluster's --peakdist=<mm> option) (DEFAULT: 0)
   -con <6|18|26>  change which voxels count as connected (in terms of how many count) (cluster's --connectivity=<n> option) (DEFAULT: 26)
   -icbm           use ICBM (Lancaster) coordinate conversion to Talairach space (DEFAULT: Brett conversion)
+  -tal            include columns with Talairach coordinates
   -td             append a field containing the readout from the Talairach Daemon
   -a [<atlas code> [...]]
        append a field containing the readout from an FSL atlas
@@ -77,7 +78,7 @@ while [ $1 ]; do
     if [ $1 == "-t" ]&&[ $2 ]; then
 	ithr=$2
 	shift 2
-    elif [ $1 == "-v" ]&&[ $2 ]; then
+    elif [ $1 == "-c" ]&&[ $2 ]; then
 	voxthr=$2
 	shift 2
     elif [ $1 == "-o" ]&&[ $2 ]; then
@@ -107,6 +108,9 @@ while [ $1 ]; do
 	shift 2
     elif [ $1 == "-icbm" ]; then
 	icbm="-icbm"
+	shift
+    elif [ $1 == "-tal" ]; then
+	tal=set
 	shift
     elif [ "$1" == "-a" ]; then
 	while [ $2 ]&&[[ ! "$2" =~ ^- ]]; do
@@ -218,7 +222,9 @@ fi
 ### GENERATE REPORT
 # make header
 # standard columns
-stdcols=",max,nvox,x,y,z"	
+stdcols=",max,nvox,x,y,z"
+# tal header
+talcols=",xtal,ytal,ztal"
 # td header
 [ $td ] && td_header=",region,BA"
 # atlas titles
@@ -228,7 +234,7 @@ done
 # if reporting local maxima, include cluster index column so that maxima can easily be matched up with their cluster peaks
 [ $runlocalmaxima ] && indexcol=",index"
 # print header
-echo ${stdcols}${td_header}${atlas_header}${indexcol} > $fout
+echo ${stdcols}${talcols}${td_header}${atlas_header}${indexcol} > $fout
 
 if [ $(cat $wd/clusters_{pos,neg} 2>/dev/null | wc -l) -ne 0 ]; then
     ### MAKE A LINE OF REPORT PER CLUSTER FOUND
@@ -248,6 +254,8 @@ if [ $(cat $wd/clusters_{pos,neg} 2>/dev/null | wc -l) -ne 0 ]; then
 	    # save number of voxels
 	    voxels[i]=$voxels
 	    
+	    [ $tal ] && talcoords=$(mni2tal $x $y $z | awk '{print ","$1","$2","$3)}')
+
 	    if [ $td ]; then # query tal daemon
 		tdfield=($(mm2label $x $y $z $icbm))
 		td_label[i]=","${tdfield[0]}"("${tdfield[1]}"),"${tdfield[2]:-N/A}
@@ -259,14 +267,14 @@ if [ $(cat $wd/clusters_{pos,neg} 2>/dev/null | wc -l) -ne 0 ]; then
 	    [ $runlocalmaxima ] && index=",         cluster$i"
 	
 	    # PRINT
-	    echo "${clnum[i]},$max,$voxels,$x,$y,$z${td_label[i]}${atlas_labels}${index}" >> $fout
+	    echo "${clnum[i]},$max,$voxels,$x,$y,$z${talcoords}${td_label[i]}${atlas_labels}${index}" >> $fout
 	done < $f
     done
     
     if [ $runlocalmaxima ]; then	
 	# print more header stuff
 	printf "\n\n***LOCAL MAXIMA***\n" >> $fout    
-	echo ",max,nvox,x,y,z${td_header}${atlas_header},cluster affiliation" >> $fout
+	echo "${stdcols}${talcols}${td_header}${atlas_header},cluster affiliation" >> $fout
 
 	nn=0
 	for f in $wd/maxima_[pn][oe][sg]; do
@@ -276,17 +284,19 @@ if [ $(cat $wd/clusters_{pos,neg} 2>/dev/null | wc -l) -ne 0 ]; then
 	    fi
             ### REPORT ON LOCAL MAXIMA
 	    while read i max x y z; do
+		[ $tal ] && talcoords=$(mni2tal $x $y $z | awk '{print ","$1","$2","$3)}')
+
 		if [ $td ]; then
 	            # get TD labeling
 		    [ $noname ] || tdfield=($(mm2label $x $y $z $icbm))
-		    [ ${tdfield[0]} ] && maxtdlabel="${tdfield[0]}(${tdfield[1]})" || maxtdlabel="no label"
+		    [ ${tdfield[0]} ] && this_td_label=","${tdfield[0]}"("${tdfield[1]}"),"${tdfield[2]:-N/A} || this_td_label="no label"
 		fi
 
 	        # get FSL atlas labeling
 		[ $atlas_codes] && atlas_labels="$(mm2label $x $y $z $icbm -a ${atlas_codes[*]} -athr $atlas_thr | while read line; do echo -n ",$line"; done)"
 
                 # PRINT
-		echo "${clnum[i]},$maxtdlabel,${tdfield[2]},$max,${voxels[i]},$x,$y,$z$atlas_labels,            cluster$i ${td_label[i]}" >> $fout
+		echo "${clnum[i]},$max,$voxels,$x,$y,$z${talcoords}${this_td_label}${atlas_labels},            cluster$i ${td_label[i]}" >> $fout
 	    done < $f
 	done
     fi
