@@ -15,11 +15,11 @@ OPTIONS:
      -c <v>     discard clusters smaller than <v> contiguous voxels
      -pos       only deal with positive intensities (DEFAULT: negative intensities also dealt with)
      -mm <x> <y> <z> [<name>]
-                only produce mask for cluster that includes voxel with mm coordinates <x> <y> <z>
+                only produce mask for cluster that includes voxel with MNI mm coordinates <x> <y> <z>
                   DEFAULT: produce mask for all clusters surviving threshold -t and -c
                 if <name> is provided, output file name will be <statmap>_<name>_cluster_mask
      -vox <x> <y> <z> [<name>]
-                same as -mm but for voxel coordinates
+                same as -mm but for voxel coordinates (must use if not in 2x2x2 MNI space)
      -td        use the talairach daemon to name mask files by cluster peak gray matter labels
                 otherwise the mask file will be <statmap>_<x>_<y>_<z>_cluster_mask
                 unless a <name> is given (the mask file will be <statmap>_<name>_cluster_mask)
