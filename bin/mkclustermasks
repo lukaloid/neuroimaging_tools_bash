@@ -1,0 +1,168 @@
+#!/bin/bash
+# Author: Luka Ruzic
+
+
+usage() {
+    echo "USAGE: mkclustermasks <statmap> [options]
+DESCRIPTION: Make cluster masks (binarized, 1s in cluster, 0s everywhere else) from <statmap>
+             by applying voxelwise and clusterwise thresholds. By default will make mask for
+             all clusters, but can specify particular clusters using mm or vox coordinates.
+DEFAULT THRESHOLDS:
+     -t 2.58 (if it looks like an inverse p map: .995)
+     -c 1 (i.e., no cluster thresholding)
+OPTIONS:
+     -t <i>     threshold voxels at intensity <i>
+     -c <v>     discard clusters smaller than <v> contiguous voxels
+     -pos       only deal with positive intensities (DEFAULT: negative intensities also dealt with)
+     -mm <x> <y> <z> [<name>]
+                only produce mask for cluster that includes voxel with mm coordinates <x> <y> <z>
+                  DEFAULT: produce mask for all clusters surviving threshold -t and -c
+                if <name> is provided, output file name will be <statmap>_<name>_cluster_mask
+     -vox <x> <y> <z> [<name>]
+                same as -mm but for voxel coordinates
+     -td        use the talairach daemon to name mask files by cluster peak gray matter labels
+                otherwise the mask file will be <statmap>_<x>_<y>_<z>_cluster_mask
+                unless a <name> is given (the mask file will be <statmap>_<name>_cluster_mask)
+     --connectivity <6/26>
+                set --connectivity option (see FSL's cluster)
+     --apply-mask            
+                apply binarized mask to make <statmap>_<x>_<y>_<z>_cluster
+     -dir <d>   put masks in directory <d>
+
+NOTES:
+     if -td is set, overwriting will be automatically avoided by appending filenames with _[1-9] suffixes
+     works on negative clusters too, now
+" >&2
+
+    exit ${1:-1}
+}
+
+mktempfail() {
+    echo "ERROR: mktemp failed to procure temporary file" >&2
+    exit 7
+}
+
+[[ "$@" =~ -help$ ]] && usage 0
+
+mni_brain=$(findMNI) #"/usr/local/fsl/etc/standard/avg152T1_brain"
+
+### PARSE ARGUMENTS
+if [ $1 ]; then
+    if [ "${1:0:1}" != "-" ]; then
+	statmap=$(remove_ext $1)
+	shift
+    else
+	echo "ERROR: first argument must be the target statmap" >&2
+	usage
+    fi
+else
+    echo "ERROR: insufficient arguments" >&2
+    usage
+fi
+# set default thresholds
+if [ "$(fslstats $statmap -R | awk '$1>-1 && $2<1 {print "INVP_MAP"}')" ]; then
+    thresh=.995
+else
+    thresh=2.58
+fi
+cthresh=1
+
+# loop through arguments
+while [ $1 ]; do
+    if [ $1 == "-t" ]&&[ $2 ]; then
+	thresh=$2
+	shift 2
+    elif [ $1 == "-c" ]&&[ $2 ]; then
+        cthresh=$2
+        shift 2
+    elif [ $1 == "-pos" ]; then
+	onlypos=set
+	shift
+    elif [ $1 == "-mm" ]||[ $1 == "-vox" ]; then
+	[ $1 == "-mm" ] && coords+=("$(mm2vox $2 $3 $4)") || coords+=("$2 $3 $4")
+	if [ $5 ]&&[[ $5 =~ ^[^-] ]]; then
+	    name+=("$5")
+	    shift 5
+	else
+	    name+=("$2_$3_$4")
+	    shift 4
+	fi
+    elif [ $1 == "-td" ]; then
+	td_naming=set
+	shift
+    elif [ $1 == "--connectivity" ]; then
+	connect=$2
+	shift 2
+    elif [ $1 == "--apply-mask" ]; then
+	apply_mask=set
+	shift
+    elif [ $1 == "-dir" ]&&[ $2 ]; then
+	dir=$2
+	mkdir $dir 2> /dev/null
+	shift 2
+    else
+	echo "UNRECOGNIZED OPTION: $1" >&2
+	usage
+    fi
+done
+
+if [ ! $statmap ]; then
+    echo "ERROR: no input image given" >&2
+    usage
+fi
+
+if [ ! "${coords[*]}" ]; then
+    do_all=set
+fi
+    
+### SETUP
+wd=$(mktemp -d "${TMPDIR:-/tmp}/mkclustermasks.XXXX") || mktempfail
+
+### PRODUCE CLUSTER MAP AND LIST
+cluster -i $statmap -t $thresh -o $wd/clustermap --connectivity=${connect:-26} > $wd/clusterlist.txt
+
+if [ ! $onlypos ]; then
+    ### PRODUCE CLUSTER MAP AND LIST FOR NEGATIVE INTENSITIES
+    # invert source mask
+    fslmaths $statmap -mul -1 $wd/negmap
+    # make cluster list
+    nposclusters=$(($(wc -l < $wd/clusterlist.txt) - 1))
+    cluster -i $wd/negmap -t $thresh -o $wd/negclustermap --connectivity=${connect:-26} | awk -v x=$posclusters 'NR>1 {$1+=x; print}' >> $wd/clusterlist.txt
+    # make cluster map
+    fslmaths $wd/negclustermap -bin -mul $nposclusters -add $wd/negclustermap -add $wd/clustermap $wd/clustermap
+fi    
+
+
+if [ $do_all ]; then
+    # add all activation clusters
+    while read x y z; do
+	coords+=("$x $y $z")
+	name+=("$(vox2mm $x $y $z | awk '{print $1"_"$2"_"$3}')")
+    done < <(awk -v t=$cthresh 'NR>1 && $2>=t {print $4,$5,$6}' $wd/clusterlist.txt)
+fi
+
+
+### MAKE MASK(S)
+for ((i=0; i<${#coords[*]}; i++)); do
+    # figure out naming
+    if [ $td_naming ]; then
+	label=$(vox2label ${coords[i]} | awk '{print $1"_"$2"_"$3}') && [ $label ] && name[i]=$label
+    fi
+    [ $dir ] && mask=${dir}/${statmap##*/}_${name[i]}_cluster_mask || mask=${statmap}_${name[i]}_cluster_mask
+
+    rm $mask 2> /dev/null
+    echo "making $mask"
+
+    # pick the desired cluster out of cluster map (FSL uses activation for indexing clusters in cluster map)
+    val=$(fslmeants -i $wd/clustermap -c ${coords[i]})
+    # create binarized mask by indexing to correct cluster via thresholding activation
+    fslmaths $wd/clustermap $(echo $val | awk '{print "-thr "$1-.5" -uthr "$1+.5}') -bin $mask
+
+    # create cluster ROI of statmap
+    if [ $apply_mask ]; then
+	echo "making ${mask%_mask}"
+	fslmaths $statmap -mul $mask ${mask%_mask}
+    fi
+done
+
+exit 0
