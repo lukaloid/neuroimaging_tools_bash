@@ -10,9 +10,9 @@ done < <(atlasquery --dumpatlases)
 
 usage() {
     echo "
-Usage: clustertable <stat_map> [options]
+USAGE: clustertable <stat_map> [options]
 
-Options:
+OPTIONS:
   -t <i>          clustering will be done with a voxelwise intensity threshold of <i> (default: 2.58)
   -c <v>          only clusters with <v> or more voxels are reported (default: 1)
   -o <filename>   will output to <filename>.csv (DEFAULT: cluster_report_<stat_map>_t<i>_v<v>.csv)
@@ -35,7 +35,7 @@ Options:
   -athr <p>
        only report areas that are more than <p>% probable
 
-Description:
+DESCRIPTION:
   -generates a cluster report for an entire zstat map
   -report includes for every cluster of voxels above the zthreshold:
     -region name (actually the nearest gray matter on a Talairach atlas)
@@ -44,8 +44,10 @@ Description:
     -number of voxels
     -MNI voxel coordinates of the Max
 
-Note: will work on lower levels, BUT ONLY inside the <analysis>.feat/stats directory
-    Tip: to generate reports for all the stat maps in a directory, use clusterall
+NOTES:
+    meant for working with 2mm MNI space images (especially -td, -tal, and -a)
+    will work on lower levels, BUT ONLY inside the <analysis>.feat/stats directory
+      (uses ../reg/example_func2standard.mat)
 " >&2
 
     exit ${1:-1}
@@ -55,6 +57,9 @@ Note: will work on lower levels, BUT ONLY inside the <analysis>.feat/stats direc
 # in order to keep all the clusters commands in a clusterall from overwriting each other to the no_clusters file
 # clusters will look for a --no_clusters_file <file> option so that it can write them all independently, to be concatenated afterwards by clusterall
 #    echo "     -odir <dir>      place output files in <dir>"    # this is not publicly viewable because it is only designed for interaction with clusterall
+
+#    Tip: to generate reports for all the stat maps in a directory, use clusterall
+#    (need to update clusterall and add to github)
 
 
 
