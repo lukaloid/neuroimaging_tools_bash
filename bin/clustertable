@@ -16,6 +16,7 @@ Options:
   -t <i>          clustering will be done with a voxelwise intensity threshold of <i> (default: 2.58)
   -c <v>          only clusters with <v> or more voxels are reported (default: 1)
   -o <filename>   will output to <filename>.csv (DEFAULT: cluster_report_<stat_map>_t<i>_v<v>.csv)
+  -noreg          don't attempt to register images if they are in non-2x2x2 MNI space
   -neg            report negative intensities (DEFAULT: only positive intensities)
   -lm             generate lines for local maxima
   -d <mm>         only report local maxima separated by <mm> (cluster's --peakdist=<mm> option) (DEFAULT: 0)
